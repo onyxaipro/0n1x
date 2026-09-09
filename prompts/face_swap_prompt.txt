@@ -1,0 +1,1 @@
+Create a new image using the body and clothing in the first image with the face present in the 2nd image. The final image should merge the head and body together perfectly and adjust the scale of the head so that it's proportionate to the body.

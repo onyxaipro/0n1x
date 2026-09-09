@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>onyx OFM ComfyUI Nodes (Monthly) — Documentation</title>
+<style>
+  body { font-family: Arial, sans-serif; max-width: 800px; margin: 40px auto; padding: 0 20px; color: #222; line-height: 1.6; }
+  h1 { font-size: 26px; border-bottom: 2px solid #333; padding-bottom: 8px; }
+  h2 { font-size: 20px; margin-top: 36px; color: #1a73e8; }
+  h3 { font-size: 16px; margin-top: 24px; }
+  table { border-collapse: collapse; width: 100%; margin: 12px 0; }
+  th, td { border: 1px solid #ccc; padding: 8px 12px; text-align: left; }
+  th { background: #f0f0f0; font-weight: bold; }
+  code { background: #f4f4f4; padding: 2px 6px; border-radius: 3px; font-family: Consolas, monospace; font-size: 14px; }
+  pre { background: #f4f4f4; padding: 14px; border-radius: 6px; overflow-x: auto; font-family: Consolas, monospace; font-size: 13px; }
+  hr { border: none; border-top: 1px solid #ddd; margin: 32px 0; }
+  ul { margin: 8px 0; }
+  li { margin: 4px 0; }
+</style>
+</head>
+<body>
+
+<h1>onyx OFM ComfyUI Nodes (Monthly)</h1>
+<p>Custom ComfyUI nodes for AI-powered image editing and prompt management.</p>
+
+<hr>
+
+<h2>Node 1: Nano Banana Pro Edit</h2>
+<p>Edit and transform images using Google's Gemini 3 Pro model through a simple API call. Supports custom aspect ratios, resolution up to 4K, and adjustable safety filters.</p>
+
+<h3>Inputs</h3>
+<table>
+  <tr><th>Input</th><th>Type</th><th>Default</th><th>Description</th></tr>
+  <tr><td>images</td><td>IMAGE</td><td>—</td><td>Input image(s) to edit</td></tr>
+  <tr><td>api_key</td><td>String</td><td>—</td><td>Your Google Gemini API key</td></tr>
+  <tr><td>prompt</td><td>Multiline String</td><td>—</td><td>Instructions for how to edit the image</td></tr>
+  <tr><td>aspect_ratio</td><td>Dropdown</td><td><code>auto</code></td><td>Output aspect ratio: auto, 1:1, 2:3, 3:2, 3:4, 4:3, 4:5, 5:4, 9:16, 16:9, 21:9</td></tr>
+  <tr><td>image_size</td><td>Dropdown</td><td><code>2K</code></td><td>Output resolution: 1K, 2K, or 4K</td></tr>
+  <tr><td>temperature</td><td>Float (0–2)</td><td>1.0</td><td>Controls creativity — higher = more creative</td></tr>
+  <tr><td>safety_threshold</td><td>Dropdown</td><td><code>BLOCK_ONLY_HIGH</code></td><td>Content safety filter level</td></tr>
+</table>
+
+<h3>Output</h3>
+<p><strong>IMAGE</strong> tensor — the edited image ready to connect to other nodes.</p>
+
+<hr>
+
+<h2>Node 2: Nano Banana 2 Edit</h2>
+<p>A faster, lighter image editor powered by Gemini 3.1 Flash for quick image edits and modifications. Same flexible controls as Pro but optimized for speed.</p>
+
+<h3>Inputs</h3>
+<table>
+  <tr><th>Input</th><th>Type</th><th>Default</th><th>Description</th></tr>
+  <tr><td>images</td><td>IMAGE</td><td>—</td><td>Input image(s) to edit</td></tr>
+  <tr><td>api_key</td><td>String</td><td>—</td><td>Your Google Gemini API key</td></tr>
+  <tr><td>prompt</td><td>Multiline String</td><td>—</td><td>Instructions for how to edit the image</td></tr>
+  <tr><td>aspect_ratio</td><td>Dropdown</td><td><code>auto</code></td><td>Output aspect ratio</td></tr>
+  <tr><td>image_size</td><td>Dropdown</td><td><code>1K</code></td><td>Output resolution: 1K, 2K, or 4K</td></tr>
+  <tr><td>temperature</td><td>Float (0–2)</td><td>1.0</td><td>Controls creativity</td></tr>
+  <tr><td>safety_threshold</td><td>Dropdown</td><td><code>BLOCK_ONLY_HIGH</code></td><td>Content safety filter level</td></tr>
+</table>
+
+<h3>Output</h3>
+<p><strong>IMAGE</strong> tensor — the edited image.</p>
+
+<hr>
+
+<h2>Node 3: Example Prompt Selector</h2>
+<p>Browse and select from pre-written example prompts stored in text files. Outputs the selected prompt as a STRING to connect to other nodes.</p>
+
+<h3>Inputs</h3>
+<table>
+  <tr><th>Input</th><th>Type</th><th>Description</th></tr>
+  <tr><td>prompt_file</td><td>Dropdown</td><td>Select which <code>.txt</code> file to browse prompts from</td></tr>
+  <tr><td>example_prompt</td><td>Dropdown</td><td>Browse prompts from the selected file</td></tr>
+  <tr><td>prompt_text</td><td>Multiline String</td><td>Editable text area — auto-populated when you select a prompt. Edit to customize.</td></tr>
+</table>
+
+<h3>Output</h3>
+<p><strong>STRING</strong> — the prompt text. Uses <code>prompt_text</code> if manually edited, otherwise the selected example prompt.</p>
+
+<h3>Navigation</h3>
+<p>Use the <strong>Prev Prompt</strong> / <strong>Next Prompt</strong> buttons to cycle through prompts, or click the dropdown to pick directly.</p>
+
+<h3>Adding Your Own Prompts</h3>
+<ol>
+  <li>Create a <code>.txt</code> file in the <code>prompts/</code> folder (e.g., <code>prompts/my_styles.txt</code>)</li>
+  <li>Write one prompt per block, separated by <code>---</code> on its own line:</li>
+</ol>
+
+<pre>A beautiful sunset over the ocean, golden light, dramatic clouds
+---
+A cyberpunk street scene at night, neon reflections, rain-soaked pavement
+---
+A cozy cabin interior with fireplace, warm lighting, rustic furniture</pre>
+
+<ol start="3">
+  <li>Restart ComfyUI — the new file appears in the <code>prompt_file</code> dropdown</li>
+</ol>
+
+<hr>
+
+<h2>File Structure</h2>
+<pre>Onyx/
+├── __init__.py              # Node registration
+├── Node.py                  # NanoBananaProEditAPINode, NanoBanana2EditAPINode
+├── prompt_selector.py       # PromptSelectorNode + API routes
+├── js/
+│   └── prompt_selector.js   # Frontend: prompt navigation + text population
+└── prompts/
+    └── *.txt                # Prompt files (--- separated)</pre>
+
+</body>
+</html>

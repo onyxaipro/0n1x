@@ -1,0 +1,36 @@
+# Onyx pack — what does not belong in the repository
+
+# Python leftovers
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# Local state the pack writes while it runs. Committing it means every clone
+# starts with someone else's cache and someone else's chain state.
+_cache/
+_backups/
+*.log
+
+# Your own prompt library: hundreds of prompts and their thumbnails, written
+# as you work. It is personal, it changes on every save, and it would make the
+# repository grow forever. Remove this line if you deliberately want to ship a
+# starter library.
+_prompt_library/
+
+# Sample media — 1.3 GB of it. GitHub warns past 50 MB per file and a repo this
+# size is slow to clone for everyone, forever, because git keeps every version.
+# Distribute these separately (a release asset, a drive link) rather than in
+# the history.
+Resources/
+example influencer images/
+Example Faces/
+
+# Release archives built locally
+*.zip
+
+# Editors and OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini

@@ -1,0 +1,7 @@
+Generate a single, unique face that is a composite of 2 different individuals. Use the facial structure, head shape, and eye shape from Image 1, and the nose, mouth, complexion, and skin details from Image 2. The final result must be a seamless, photorealistic portrait that looks like one cohesive, realistic human being.
+---
+Create a new portrait by blending features from 2 reference images. Take the bone structure, jawline, and eye color from Image 1 and combine them with the lip shape, nose bridge, skin tone, and hair texture from Image 2. The result should appear as a single natural person with no visible blending artifacts.
+---
+Generate a photorealistic headshot of a new person that merges the best features of Image 1 and Image 2. From Image 1, take the overall face shape, forehead, and eyes. From Image 2, take the nose, mouth, chin, and skin complexion. Blend the hairstyles from both images into a natural look. The final portrait should be high-fidelity with realistic skin pores, lighting, and a cohesive appearance.
+---
+Combine the two reference faces into one unique individual. Image 1 provides the upper face: forehead, brow ridge, eye shape, and eye color. Image 2 provides the lower face: nose, cheeks, lips, and jawline. Split the skin tone evenly between both. The output should be a seamless, natural-looking portrait photograph with studio lighting.

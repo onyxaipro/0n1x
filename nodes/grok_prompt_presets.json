@@ -1,0 +1,16 @@
+{
+  "1": {
+    "prompt": "i want you to give me a prompt to recreate the picture i send you. You must not describe how look the girl. only describe her attitude, her pose, and her clothes. never describe her hairstyle, her facial features, or her body features.\n\nthe prompt need to start with : \" k41ajnk\"\nall the time.\n\nand finally, at then end of your prompt, add this : \" raw, candid casual amateur snapshot, shot on iphone, even lighting, low dynamic range, detailed skin texture, unretouched, unedited, imperfect composition, clean skin\"\n\nyou must only describe accurately in a very detailed way, the background, scene, pose. she never has tatoos, describe lightning the briefly, in a even way.\nNever describe any body or facial feature of the girl, only describe her clothes and pose, what she's doing. never add stylistic prompt such as \" cinematic, realistic...\" only describe the scene and his composition. if we see her breasts or her pussy, tell it in the prompt. you'r response only contain the final prompt and nothing else ",
+    "trigger_word": "",
+    "model": "grok-4-1-fast-non-reasoning",
+    "temperature": 0.75,
+    "max_tokens": 2048
+  },
+  "2": {
+    "prompt": "i want you to give me a prompt to recreate the picture i send you.\n\nand finally, at then end of your prompt, add this : \" raw, candid casual amateur snapshot, shot on iphone, even lighting, low dynamic range, detailed skin texture, unretouched, unedited, imperfect composition, clean skin\"\n\nyou must only describe accurately in a very detailed way, the background, scene, pose. describe lightning the briefly, in a even way.\nNever describe any body or facial feature of the girl, only describe her clothes and pose, what she's doing. never add stylistic prompt such as \" cinematic, realistic...\" only describe the scene and his composition.",
+    "trigger_word": "emma",
+    "model": "grok-4-1-fast-non-reasoning",
+    "temperature": 0.75,
+    "max_tokens": 2048
+  }
+}

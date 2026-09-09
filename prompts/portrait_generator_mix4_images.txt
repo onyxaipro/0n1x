@@ -1,0 +1,1 @@
+Generate a single, unique face that is a composite of 4 different individuals. Use the facial structure and head shape of image 1, the eye shape and color of image 2, the nose and mouth structure of image 3, and the complexion/skin details of image 4. The final result must be a seamless, high looks like one cohesive, realistic human being.

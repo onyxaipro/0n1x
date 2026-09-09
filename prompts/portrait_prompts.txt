@@ -1,0 +1,21 @@
+Show the character's face from the front angle, keep the entire head and hair fully visible within the frame
+---
+Show the character's face from the left side profile angle, keep the entire head and hair fully visible within the frame
+---
+Show the character's face from the right side profile angle, keep the entire head and hair fully visible within the frame
+---
+Show the character's face from a three-quarter left angle, keep the entire head and hair fully visible within the frame
+---
+Show the character's face from a three-quarter right angle, keep the entire head and hair fully visible within the frame
+---
+Show the character's face from a top-down angle looking down, keep the entire head and hair fully visible within the frame
+---
+Show the character's face from a low angle looking up, keep the entire head and hair fully visible within the frame
+---
+Turn the character's face slightly to the left, keep the entire head and hair fully visible within the frame
+---
+Turn the character's face slightly to the right, keep the entire head and hair fully visible within the frame
+---
+Tilt the character's face slightly upward, keep the entire head and hair fully visible within the frame
+---
+Tilt the character's face slightly downward, keep the entire head and hair fully visible within the frame
