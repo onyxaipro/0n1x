@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+from .onyx_render_profile import ensure_profile_ready
 """
 ComfyUI node - Onyx Image Blur (batched).
 
@@ -115,6 +116,7 @@ class OnyxImageBlurBatched:
     CATEGORY = "image/postprocessing"
 
     def blur(self, image, blur_radius, sigma, frames_per_slice=0):
+        ensure_profile_ready()
         if blur_radius <= 0:
             return (image,)
 
@@ -216,6 +218,7 @@ class OnyxImageCompositeMaskedBatched:
 
     def composite(self, destination, source, x, y, resize_source,
                   mask=None, frames_per_slice=0):
+        ensure_profile_ready()
         total = int(destination.shape[0])
         height, width = int(destination.shape[1]), int(destination.shape[2])
         channels = int(destination.shape[3]) if destination.ndim == 4 else 1

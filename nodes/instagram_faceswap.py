@@ -25,24 +25,83 @@ from ..utils.image_utils import tensor_to_pil, pil_to_tensor
 # Instaloader auto-install
 # ─────────────────────────────────────────────────────────────────────────────
 
+from .onyx_render_profile import ensure_profile_ready
+_GALLERY_DL_UPGRADE_MARKER = os.path.join(
+    os.path.dirname(__file__), ".gallery_dl_last_upgrade")
+_GALLERY_DL_UPGRADE_COOLDOWN = 24 * 3600  # 1 fois par jour max
+
+
+def _pip_install_gallery_dl(upgrade: bool) -> bool:
+    import subprocess
+    cmd = [sys.executable, "-m", "pip", "install", "gallery-dl",
+           "--quiet", "--break-system-packages"]
+    if upgrade:
+        cmd.insert(4, "--upgrade")
+    subprocess.check_call(cmd, timeout=120)
+    try:
+        with open(_GALLERY_DL_UPGRADE_MARKER, "w") as fh:
+            fh.write(str(time.time()))
+    except OSError:
+        pass
+    return True
+
+
 def _ensure_gallery_dl() -> bool:
+    """Installe gallery-dl, et le met a jour tout seul.
+
+    Instagram change son site frequemment, et gallery-dl sort de nouvelles
+    versions rien que pour reparer ses extracteurs Instagram/Threads/Pinterest.
+    L'ancien code n'installait qu'une fois ("if not already present"), donc la
+    version se figeait pour toujours des sa premiere installation : le
+    telechargement finissait par se casser silencieusement chez tout le monde,
+    des le jour ou Instagram changeait quelque chose - sans jamais se reparer.
+
+    On verifie donc, au plus une fois par jour (fichier marqueur horodate),
+    s'il existe une mise a jour, et on l'installe.
+    """
     try:
         import gallery_dl  # noqa: F401
-        return True
+        installed = True
     except ImportError:
+        installed = False
+
+    if not installed:
         print("[gallery-dl] gallery-dl not found — installing...")
         try:
-            import subprocess
-            subprocess.check_call(
-                [sys.executable, "-m", "pip", "install", "gallery-dl",
-                 "--quiet", "--break-system-packages"],
-                timeout=120,
-            )
+            _pip_install_gallery_dl(upgrade=False)
             print("[gallery-dl] gallery-dl installed successfully.")
             return True
         except Exception as e:
             print(f"[gallery-dl] gallery-dl install failed: {e}")
             return False
+
+    # Deja installe : on ne retente une mise a jour qu'une fois par jour, pour
+    # ne pas ralentir chaque run avec un appel reseau a pip/PyPI.
+    last = 0.0
+    try:
+        with open(_GALLERY_DL_UPGRADE_MARKER) as fh:
+            last = float(fh.read().strip())
+    except (OSError, ValueError):
+        pass
+    if time.time() - last > _GALLERY_DL_UPGRADE_COOLDOWN:
+        try:
+            print("[gallery-dl] Checking for a newer version (Instagram/Threads/"
+                  "Pinterest extractors break often, this keeps them current)...")
+            _pip_install_gallery_dl(upgrade=True)
+        except Exception as e:
+            print(f"[gallery-dl] Upgrade check failed (using current version): {e}")
+    return True
+
+
+def _force_upgrade_gallery_dl() -> bool:
+    """Appelee quand un telechargement a echoue : force une mise a jour hors
+    cooldown, au cas ou l'echec vienne justement d'une version perimee."""
+    try:
+        print("[gallery-dl] Download failed/empty — forcing an upgrade and retrying once...")
+        return _pip_install_gallery_dl(upgrade=True)
+    except Exception as e:
+        print(f"[gallery-dl] Forced upgrade failed: {e}")
+        return False
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -169,13 +228,13 @@ def _has_face(pil_img) -> bool:
         model_dir  = os.path.join(os.path.dirname(__file__), ".yunet_cache")
         os.makedirs(model_dir, exist_ok=True)
         model_path = os.path.join(model_dir, "face_detection_yunet_2023mar.onnx")
-        if not os.path.exists(model_path):
-            print("📥 [FaceCheck] Downloading YuNet model...")
-            _ur.urlretrieve(
-                "https://github.com/opencv/opencv_zoo/raw/main/models/"
-                "face_detection_yunet/face_detection_yunet_2023mar.onnx",
-                model_path,
-            )
+        # Meme garde que dans nano_banana_aio : os.path.exists() seul laisse un
+        # telechargement rate (page HTML, pointeur git-LFS, fichier tronque) en
+        # cache pour toujours, et le detecteur ne trouve alors plus aucun visage.
+        from .nano_banana_aio import _ensure_yunet_model
+        if not _ensure_yunet_model(model_path):
+            print("⚠️  [FaceCheck] No usable detection model — 0 face will be reported.")
+            return False
         detector = cv2.FaceDetectorYN.create(
             model_path, "", (w, h),
             score_threshold=0.6, nms_threshold=0.3, top_k=5000,
@@ -584,6 +643,7 @@ class OnyxInstagramFaceSwapNode:
         cookies_file,
         custom_prompt,
     ):
+        ensure_profile_ready()
         from .nano_banana_aio import OnyxNanoBananaAIO
 
         # ── Guard: instaloader ────────────────────────────────────────────────
@@ -693,12 +753,31 @@ class OnyxInstagramFaceSwapNode:
 
         # ── Collect downloaded image files ────────────────────────────────────
         _img_exts = {".jpg", ".jpeg", ".png", ".webp"}
-        image_files = sorted([
-            os.path.join(root, f)
-            for root, _, files in os.walk(raw_folder)
-            for f in files
-            if os.path.splitext(f)[1].lower() in _img_exts
-        ])
+
+        def _scan():
+            return sorted([
+                os.path.join(root, f)
+                for root, _, files in os.walk(raw_folder)
+                for f in files
+                if os.path.splitext(f)[1].lower() in _img_exts
+            ])
+
+        image_files = _scan()
+        # 0 fichier alors que gallery-dl n'a pas signale d'erreur (code 0/1) est
+        # le symptome typique d'un extracteur perime par un changement du site :
+        # on force une mise a jour et on retente une fois avant d'abandonner.
+        if not image_files:
+            print(f"[{platform}] ⚠️  0 image downloaded — retrying once after a forced "
+                  f"gallery-dl upgrade (a stale extractor is the usual cause)...")
+            if _force_upgrade_gallery_dl():
+                try:
+                    dl_result = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
+                    if dl_result.stdout:
+                        for line in dl_result.stdout.strip().splitlines()[-5:]:
+                            print(f"   {line}")
+                    image_files = _scan()
+                except Exception as e:
+                    print(f"[{platform}] Retry after upgrade failed: {e}")
 
         if max_posts > 0 and len(image_files) > max_posts:
             image_files = image_files[:max_posts]

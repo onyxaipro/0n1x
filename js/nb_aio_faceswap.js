@@ -7,7 +7,7 @@
 import { app } from "../../scripts/app.js";
 // ─── Constantes mode vidéo ─────────────────────────────────────────────────
 const VIDEO_MODELS         = ["Veo 3.1 Lite", "Veo 3.1", "Veo 3.1 Fast", "Kling 3.0", "Kling 2.6", "Kling 3.0 Motion Control", "Seedance 2.0", "Seedance 2.5", "Omni Flash"];
-const IMAGE_MODELS_DEFAULT = ["Nano Banana Pro", "Nano Banana 2", "Seedream 4.5", "Seedream 5 Pro", "GPT Image 2.0"];
+const IMAGE_MODELS_DEFAULT = ["Nano Banana Pro", "Nano Banana 2", "Seedream 4.5", "Seedream 5 Pro", "GPT Image 2.0", "GPT Image 2.5 Flare", "GPT Image 2.5 Sunburst"];
 const VIDEO_ASPECT_RATIOS  = ["16:9", "9:16"];
 const IMAGE_ASPECT_RATIOS  = ["auto", "1:1", "2:3", "3:2", "3:4", "4:3", "4:5", "5:4", "9:16", "16:9", "21:9"];
 const VIDEO_RESOLUTIONS    = ["480p", "720p", "1080p", "4K"];
@@ -156,6 +156,11 @@ const GPT2_ASPECT_RATIOS = ["auto", "1:1", "4:3", "3:4", "16:9", "9:16"];
 const GPT2_NEAREST_AR = {
     "2:3": "9:16", "3:2": "16:9", "4:5": "3:4", "5:4": "4:3", "21:9": "16:9",
 };
+// GPT Image 2.5 (Flare / Sunburst) — tous les ratios du node sont acceptés
+// (sur Kie, 4:5 / 5:4 sont ramenés au plus proche côté Python).
+// Qualité : 5 paliers pour la 2.5, 3 seulement pour la 2.0.
+const GPT_QUALITIES    = ["low", "medium", "high", "xhigh", "max"];
+const GPT2_QUALITIES   = ["low", "medium", "high"];
 function setupKlingAspectRatioSync(node) {
     // Kling supporte 16:9 ET 9:16 — le dropdown est déjà restreint à VIDEO_ASPECT_RATIOS
     // en mode vidéo, donc aucun verrouillage supplémentaire n'est nécessaire.
@@ -386,8 +391,21 @@ function setupGPT2Sync(node) {
         return GPT2_NEAREST_AR[value] || "1:1";
     }
 
+    /** Restreint gpt2_image_quality à low/medium/high pour GPT Image 2.0. */
+    const qualityWidget = getWidget(node, "gpt2_image_quality");
+    const syncQuality = () => {
+        if (!qualityWidget?.options?.values) return;
+        const list = (modelWidget.value === "GPT Image 2.0") ? GPT2_QUALITIES : GPT_QUALITIES;
+        qualityWidget.options.values = [...list];
+        if (!list.includes(qualityWidget.value)) {
+            qualityWidget.value = "high";
+            if (qualityWidget.callback) qualityWidget.callback("high");
+        }
+    };
+
     /** Applique ou retire le filtre GPT2 sur le dropdown aspect_ratio. */
     const syncAR = () => {
+        syncQuality();
         const isGPT2 = (modelWidget.value === "GPT Image 2.0");
         if (isGPT2) {
             if (arWidget.options?.values) arWidget.options.values = [...GPT2_ASPECT_RATIOS];

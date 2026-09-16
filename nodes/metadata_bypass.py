@@ -10,6 +10,7 @@ import torch
 from PIL import Image
 
 
+from .onyx_render_profile import ensure_profile_ready
 class OnyxMetadataBypassNode:
     """Pass-through node that strips all metadata from images and returns clean tensors."""
 
@@ -28,6 +29,7 @@ class OnyxMetadataBypassNode:
     CATEGORY      = "Onyx/Automation"
 
     def run(self, images):
+        ensure_profile_ready()
         cleaned = []
         for i in range(images.shape[0]):
             # Tensor [H, W, 3] float32 0-1 → uint8 PIL

@@ -8,6 +8,7 @@ API Keys: connect an ApiKeysLoaderNode to the corresponding inputs.
 # Évite le chargement des bibliothèques lourdes (gRPC, google-genai…) en double,
 # ce qui empêchait ComfyUI de s'arrêter proprement lors du restart.
 import os as _os_backup_check
+from .onyx_render_profile import ensure_profile_ready
 if any(s in _os_backup_check.path.basename(__file__)
        for s in (" - Copie", " - Copy", "_copy", "_backup", " copy", " backup")):
     raise ImportError(
@@ -58,6 +59,8 @@ _MODEL_MAP = {
     "Seedream 4.5":    "seedream-v4.5",
     "Seedream 5 Pro":  "seedream-5-pro",       # KIE uniquement pour l'instant
     "GPT Image 2.0":   "openai/gpt-image-2",   # WaveSpeed uniquement
+    "GPT Image 2.5 Flare":    "openai/gpt-image-2.5-flare",     # WAVESPEED / KIE / FAL
+    "GPT Image 2.5 Sunburst": "openai/gpt-image-2.5-sunburst",  # WAVESPEED / KIE / FAL
 }
 
 # ── Video models (Google Veo) ─────────────────────────────────────────────────
@@ -489,6 +492,8 @@ WAVESPEED_SUBMIT_NB2_URL = f"{WAVESPEED_BASE_URL}/google/nano-banana-2/edit"
 WAVESPEED_SEEDREAM_URL   = f"{WAVESPEED_BASE_URL}/bytedance/seedream-v4.5/edit"
 WAVESPEED_SEEDREAM5PRO_URL = f"{WAVESPEED_BASE_URL}/bytedance/seedream-v5.0-pro/edit"
 WAVESPEED_GPT2_URL       = f"{WAVESPEED_BASE_URL}/openai/gpt-image-2/edit"
+# GPT Image 2.5 : un endpoint par variante (flare|sunburst) ET par mode (text-to-image|edit)
+WAVESPEED_GPT25_URL      = f"{WAVESPEED_BASE_URL}/openai/gpt-image-2.5-{{variant}}/{{mode}}"
 WAVESPEED_POLL_URL       = f"{WAVESPEED_BASE_URL}/predictions/{{task_id}}/result"
 WAVESPEED_CANCEL_URL     = f"{WAVESPEED_BASE_URL}/predictions/{{task_id}}"
 WAVESPEED_TIMEOUT_S      = 300
@@ -619,6 +624,8 @@ FAL_SEEDREAM_ENDPOINT  = "fal-ai/bytedance/seedream/v4.5/edit"
 FAL_SEEDREAM5PRO_ENDPOINT = "bytedance/seedream/v5/pro/edit"
 FAL_GPT2_EDIT_ENDPOINT    = "openai/gpt-image-2/edit"
 FAL_GPT2_TXT2IMG_ENDPOINT = "openai/gpt-image-2"
+# GPT Image 2.5 : variante (flare|sunburst) et mode (text-to-image|edit) dans le chemin
+FAL_GPT25_ENDPOINT        = "openai/gpt-image-2.5/{variant}/{mode}"
 FAL_VEO31_ENDPOINT          = "fal-ai/veo3.1/image-to-video"
 FAL_KLING26_I2V_ENDPOINT    = "fal-ai/kling-video/v2.6/pro/image-to-video"
 FAL_KLING26_T2V_ENDPOINT    = "fal-ai/kling-video/v2.6/pro/text-to-video"
@@ -707,6 +714,103 @@ _GPT2_FAL_SIZE_MAP = {
     ("9:16", "2K"): {"width": 1440, "height": 2560},    # 3 686 400 px
     ("9:16", "4K"): {"width": 2160, "height": 3840},    # 8 294 400 px (max 9:16)
 }
+
+# ─────────────────────────────────────────────────────────────────────────────
+# GPT Image 2.5 (OpenAI) — variantes Flare et Sunburst · WAVESPEED / KIE / FAL
+# ─────────────────────────────────────────────────────────────────────────────
+# Flare    : variante rapide / équilibrée (modèle par défaut côté OpenAI).
+# Sunburst : variante « précision », plus lente, plus fidèle sur le détail fin.
+# Les deux ont exactement le même schéma de paramètres ; seul l'id change.
+#
+#   WaveSpeed  POST /openai/gpt-image-2.5-{flare|sunburst}/{text-to-image|edit}
+#              images[] (edit, ≤16) · aspect_ratio (1:1 1:2 2:1 1:3 3:1 2:3 3:2
+#              3:4 4:3 4:5 5:4 9:16 16:9 9:21 21:9 — omis = ratio de la 1re image
+#              en edit) · resolution 1k/2k/4k · quality low/medium/high/xhigh/max
+#              · output_format. Pas de champ background.
+#   Kie.ai     model gpt-image-2-5-{flare|sunburst}-{text-to-image|image-to-image}
+#              input_urls (i2i, ≤16) · aspect_ratio auto 1:1 3:2 2:3 4:3 3:4 16:9
+#              9:16 21:9 (+ 27:16 16:27 9:8 8:9 en 1K seulement) · resolution
+#              1K/2K/4K · background. PAS de quality, PAS de nsfw_checker
+#              (contrairement à GPT Image 2.0). Prompt ≤ 20 000 caractères.
+#   Fal.ai     openai/gpt-image-2.5/{flare|sunburst}/{text-to-image|edit}
+#              image_urls (edit, ≤16) · image_size (preset | {width,height} |
+#              "auto") · quality auto/low/medium/high/xhigh/max · background ·
+#              num_images · output_format. Tailles custom : multiples de 16, bord
+#              max 3840 px, ratio ≤ 3:1, total entre 655 360 et 8 294 400 px.
+_GPT25_VARIANTS = {
+    "GPT Image 2.5 Flare":    "flare",
+    "GPT Image 2.5 Sunburst": "sunburst",
+}
+_GPT25_MODELS    = set(_GPT25_VARIANTS)
+_GPT25_PROVIDERS = ("WAVESPEED", "KIE", "FAL")
+_GPT25_SIZES     = ("1K", "2K", "4K")                          # pas de palier 8K
+_GPT25_QUALITIES = ("low", "medium", "high", "xhigh", "max")
+_GPT2_QUALITIES  = ("low", "medium", "high")                   # GPT Image 2.0 (FAL)
+
+KIE_GPT25_MODEL        = "gpt-image-2-5-{variant}-{mode}"       # mode : text-to-image | image-to-image
+_GPT25_KIE_PROMPT_MAX  = 20000
+# Kie ne propose ni 4:5 ni 5:4 → ratio le plus proche (disponible en 2K/4K)
+_GPT25_KIE_AR          = {"auto", "1:1", "3:2", "2:3", "4:3", "3:4", "16:9", "9:16", "21:9"}
+_GPT25_KIE_NEAREST_AR  = {"4:5": "3:4", "5:4": "4:3"}
+
+# Fal : cible de pixels par palier, bornée par les contraintes de l'API
+_GPT25_FAL_TARGET_PX = {
+    "1K": 1024 * 1024,      # ~1 MP   (1:1 → 1024×1024, 16:9 → 1280×720)
+    "2K": 2048 * 2048,      # ~4 MP   (1:1 → 2048×2048, 16:9 → 2560×1440)
+    "4K": 8_294_400,        # plafond (1:1 → 2880×2880, 16:9 → 3840×2160)
+}
+_GPT25_FAL_MIN_PX   = 655_360
+_GPT25_FAL_MAX_PX   = 8_294_400
+_GPT25_FAL_MAX_EDGE = 3840
+
+
+def _gpt25_label(variant: str) -> str:
+    return f"GPT Image 2.5 {str(variant).capitalize()}"
+
+
+def _gpt25_size(image_size: str) -> str:
+    """1K/2K/4K tel quel ; 8K → 4K ; toute autre valeur → 2K."""
+    if image_size in _GPT25_SIZES:
+        return image_size
+    return "4K" if image_size == "8K" else "2K"
+
+
+def _gpt25_fal_size(aspect_ratio: str, image_size: str):
+    """Taille custom Fal {width, height} au ratio EXACT, conforme aux contraintes.
+
+    Pour un ratio réduit a:b, les dimensions 16·a·k × 16·b·k sont toujours des
+    multiples de 16 et gardent le ratio exact ; on prend le plus grand k qui
+    respecte la cible de pixels du palier et le bord max de 3840 px.
+    Retourne "auto" si le ratio est "auto" ou hors limites (> 3:1).
+    """
+    import math
+    if not aspect_ratio or aspect_ratio == "auto":
+        return "auto"
+    try:
+        a, b = (int(x) for x in str(aspect_ratio).split(":"))
+        g = math.gcd(a, b)
+        a, b = a // g, b // g
+    except (ValueError, ZeroDivisionError):
+        return "auto"
+    if a <= 0 or b <= 0 or max(a, b) > 3 * min(a, b):
+        return "auto"
+    target = _GPT25_FAL_TARGET_PX[_gpt25_size(image_size)]
+    k = int(min((target / (256 * a * b)) ** 0.5, _GPT25_FAL_MAX_EDGE / (16 * max(a, b))))
+    k = max(1, k)
+    while k > 1 and 256 * a * b * k * k > _GPT25_FAL_MAX_PX:
+        k -= 1
+    while 256 * a * b * k * k < _GPT25_FAL_MIN_PX and 16 * max(a, b) * (k + 1) <= _GPT25_FAL_MAX_EDGE:
+        k += 1
+    return {"width": 16 * a * k, "height": 16 * b * k}
+
+
+def _gpt25_download_tensor(url: str):
+    """Télécharge l'image résultat et la convertit en tenseur [1, H, W, 3]."""
+    resp = requests.get(url, timeout=120)
+    resp.raise_for_status()
+    pil_result = Image.open(io.BytesIO(resp.content)).convert("RGB")
+    image_np   = np.array(pil_result).astype(np.float32) / 255.0
+    return torch.from_numpy(image_np)[None,]
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Presets — fichier JSON stocké à côté du node
@@ -1069,6 +1173,194 @@ def _reconcile_batch_shapes(generated_images, tag="Batch"):
 # ─────────────────────────────────────────────────────────────────────────────
 # Node principal
 # ─────────────────────────────────────────────────────────────────────────────
+# ─────────────────────────────────────────────────────────────────────────────
+#  YuNet model: fetch, and above all VALIDATE
+#
+# Le defaut repare ici : l'ancien code ne testait que os.path.exists(). Un
+# telechargement rate laisse quand meme un fichier - page HTML 404, pointeur
+# git-LFS de 130 octets, archive tronquee par une coupure reseau. exists()
+# repond "oui", le modele invalide est reutilise a chaque execution, et
+# FaceDetectorYN ne trouve plus jamais un seul visage. Sans message, et sans
+# jamais se reparer : c'est le profil exact d'une panne qui touche toutes les
+# installations le meme jour et y reste.
+#
+# On valide donc le CONTENU, et un fichier invalide est supprime puis
+# retelecharge depuis une autre source.
+# ─────────────────────────────────────────────────────────────────────────────
+
+_YUNET_MIN_BYTES = 200_000        # le modele reel fait ~232 Ko
+_YUNET_SOURCES = [
+    # Le miroir jsDelivr sert le contenu reel meme quand le fichier est suivi
+    # par git-LFS, la ou l'URL /raw/ de GitHub peut renvoyer un pointeur texte.
+    "https://cdn.jsdelivr.net/gh/opencv/opencv_zoo@main/models/"
+    "face_detection_yunet/face_detection_yunet_2023mar.onnx",
+    "https://github.com/opencv/opencv_zoo/raw/main/models/"
+    "face_detection_yunet/face_detection_yunet_2023mar.onnx",
+    "https://raw.githubusercontent.com/opencv/opencv_zoo/main/models/"
+    "face_detection_yunet/face_detection_yunet_2023mar.onnx",
+]
+
+
+def _yunet_problem(path: str):
+    """Return why this file is not a usable ONNX model, or None if it is."""
+    if not os.path.isfile(path):
+        return "absent"
+    size = os.path.getsize(path)
+    if size < _YUNET_MIN_BYTES:
+        with open(path, "rb") as fh:
+            head = fh.read(200)
+        if head.lstrip().startswith(b"version https://git-lfs"):
+            return f"pointeur git-LFS ({size} octets) au lieu du modele"
+        low = head.lower()
+        if b"<!doctype" in low or b"<html" in low:
+            return f"page HTML ({size} octets) — le telechargement a renvoye une erreur"
+        return f"tronque : {size} octets, il en faut au moins {_YUNET_MIN_BYTES}"
+    with open(path, "rb") as fh:
+        magic = fh.read(1)
+    # Un ONNX est un protobuf : le premier champ est ir_version (0x08).
+    if magic not in (b"\x08", b"\x0a", b"\x12"):
+        return f"ce n'est pas un fichier ONNX (premier octet {magic!r})"
+    return None
+
+
+def _ensure_yunet_model(model_path: str) -> bool:
+    """Make model_path a valid YuNet model. Returns False if impossible."""
+    problem = _yunet_problem(model_path)
+    if problem is None:
+        return True
+
+    if problem != "absent":
+        print(f"🔧 [FaceSwap] Cached detection model unusable — {problem}.")
+        print("   Deleting it and downloading again.")
+        try:
+            os.remove(model_path)
+        except OSError as e:
+            print(f"❌ [FaceSwap] Could not delete {model_path}: {e}")
+            return False
+
+    os.makedirs(os.path.dirname(model_path), exist_ok=True)
+    for i, url in enumerate(_YUNET_SOURCES, 1):
+        tmp = model_path + ".part"
+        try:
+            print(f"📥 [FaceSwap] Downloading detection model ({i}/{len(_YUNET_SOURCES)})…")
+            _urllib_request.urlretrieve(url, tmp)
+            bad = _yunet_problem(tmp)
+            if bad:
+                # Ecrire un fichier invalide sous son nom definitif est
+                # exactement ce qui a cause la panne : on ne le renomme que
+                # s'il est valide.
+                print(f"   source {i} a renvoye : {bad}")
+                os.remove(tmp)
+                continue
+            os.replace(tmp, model_path)
+            print(f"✅ [FaceSwap] Detection model ready ({os.path.getsize(model_path)} octets).")
+            return True
+        except Exception as e:
+            print(f"   source {i} indisponible : {type(e).__name__}: {str(e)[:90]}")
+            if os.path.exists(tmp):
+                try:
+                    os.remove(tmp)
+                except OSError:
+                    pass
+    print("❌ [FaceSwap] Every download source failed.")
+    print("   Place the file by hand at:")
+    print(f"   {model_path}")
+    print("   from https://github.com/opencv/opencv_zoo "
+          "(models/face_detection_yunet/face_detection_yunet_2023mar.onnx)")
+    return False
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  OpenCV: plusieurs distributions installees en meme temps
+#
+# opencv-python, opencv-python-headless et opencv-contrib-python fournissent
+# toutes le meme module cv2, au meme endroit sur le disque. Quand plusieurs
+# sont installees, chaque pip install/uninstall d'un autre custom node peut
+# ecraser le binaire natif (.pyd/.so) d'une des trois avec celui d'une autre,
+# et YuNet se met a ne plus rien detecter, sans exception, sans message.
+#
+# Auto-fix limite mais honnete : pip peut nettoyer le DISQUE des maintenant,
+# mais cv2 est deja charge en memoire dans ce process au moment ou on arrive
+# ici (c'est precisement pour ca qu'on est dans cette branche) - un module
+# natif ne se recharge pas a chaud. Le nettoyage ne prend donc effet qu'au
+# PROCHAIN demarrage de ComfyUI. On le fait quand meme, avec un cooldown pour
+# ne pas retenter a chaque image generee, et on le dit clairement.
+# ─────────────────────────────────────────────────────────────────────────────
+
+_OPENCV_FIX_MARKER = os.path.join(os.path.dirname(__file__), ".opencv_last_fix")
+_OPENCV_FIX_COOLDOWN = 24 * 3600  # 1 tentative par jour maximum
+
+
+def _trigger_comfyui_reboot() -> None:
+    """Demande a ComfyUI-Manager de redemarrer tout le process ComfyUI.
+
+    Necessite ComfyUI-Manager (endpoint GET /manager/reboot). Le process se
+    tue ou se relance des que la requete est recue, donc une coupure de
+    connexion ICI est le signe normal que ca a marche, pas un echec — on ne
+    peut pas faire mieux que le signaler honnetement dans les deux cas.
+    """
+    try:
+        from comfy.cli_args import args as _comfy_args
+        host = _comfy_args.listen or "127.0.0.1"
+        if host in ("0.0.0.0", "::"):
+            host = "127.0.0.1"
+        port = _comfy_args.port or 8188
+    except Exception:
+        host, port = "127.0.0.1", 8188
+
+    url = f"http://{host}:{port}/manager/reboot"
+    print(f"   🔁 [FaceSwap] Tentative de redemarrage automatique via ComfyUI-Manager ({url})...")
+    try:
+        resp = requests.get(url, timeout=3)
+        if resp.status_code == 403:
+            print("   ↳ ComfyUI-Manager a refuse (niveau de securite trop restrictif). "
+                  "Redemarre a la main, ou baisse le 'Security level' dans Manager.")
+        else:
+            print(f"   ↳ reponse recue (code {resp.status_code}) sans coupure — "
+                  f"verifie si ComfyUI a bien redemarre.")
+    except Exception:
+        print("   ↳ connexion coupee pendant la requete — signe probable que ComfyUI redemarre "
+              "(ComfyUI-Manager doit etre installe pour que ceci fonctionne).")
+    print("   Si ComfyUI n'a pas redemarre tout seul dans les secondes qui suivent, "
+          "ferme-le et relance-le a la main.")
+
+
+def _ensure_single_opencv(installed) -> bool:
+    """cv2 est deja charge dans CE process au moment ou on arrive ici (c'est
+    justement pour ca qu'on detecte le probleme). Sur Windows, un .pyd charge
+    est verrouille par l'OS : un pip uninstall tente maintenant laisserait le
+    meme dossier temporaire orphelin que Jean a du nettoyer a la main, ComfyUI
+    ferme (rapporte le 14/09). On ne tente donc PAS pip ici : on demande juste
+    le redemarrage, et c'est le tout debut de __init__.py - avant que cv2 ne
+    soit importe par quiconque dans le nouveau process - qui fait le nettoyage
+    pendant qu'aucun verrou n'existe encore.
+    """
+    last = 0.0
+    try:
+        with open(_OPENCV_FIX_MARKER) as fh:
+            last = float(fh.read().strip())
+    except (OSError, ValueError):
+        pass
+    if time.time() - last < _OPENCV_FIX_COOLDOWN:
+        print("   ↳ redemarrage deja tente dans les dernieres 24h, on attend avant de retenter.")
+        return False
+
+    try:
+        with open(_OPENCV_FIX_MARKER, "w") as fh:
+            fh.write(str(time.time()))
+    except OSError:
+        pass
+
+    print("   🔁 [FaceSwap] cv2 est deja charge dans ce process — impossible de nettoyer les "
+          "distributions OpenCV en double sans redemarrer (Windows verrouille le .pyd charge). "
+          "Le nettoyage se fera automatiquement au tout debut du prochain demarrage, avant que "
+          "cv2 n'y soit rechargé.")
+    # Ce swap a deja echoue (0 visage), donc rien n'est perdu a redemarrer
+    # maintenant plutot que d'attendre que Jean ferme ComfyUI a la main.
+    _trigger_comfyui_reboot()
+    return True
+
+
 class OnyxNanoBananaAIO:
     _vertex_rotation_offset  = 0
     # Services d'upload en echec, avec l'HORODATAGE de l'echec plutot qu'un
@@ -1201,9 +1493,15 @@ class OnyxNanoBananaAIO:
                     "default": False,
                     "tooltip": "[FAL NB] Enable web search",
                 }),
-                "gpt2_image_quality": (["high", "medium", "low"], {
+                # Nom historique conservé : renommer le widget casserait les
+                # workflows sauvegardés. Il pilote aussi GPT Image 2.5.
+                "gpt2_image_quality": (["low", "medium", "high", "xhigh", "max"], {
                     "default": "high",
-                    "tooltip": "[GPT Image 2.0 / FAL] Generation quality. Ignored on other models.",
+                    "tooltip": "[GPT Image] Generation quality. Ignored on other models.\n"
+                               "• GPT Image 2.0 (FAL): low / medium / high — xhigh & max fall back to high.\n"
+                               "• GPT Image 2.5 Flare / Sunburst (FAL, WaveSpeed): low → max.\n"
+                               "  Higher tiers add detail and cost noticeably more.\n"
+                               "• Kie.ai has no quality setting for GPT Image 2.5 (ignored).",
                 }),
                 "image_1": ("IMAGE", {"tooltip": "Main source image"}),
                 "image_2": ("IMAGE", {"tooltip": "Image source 2"}),
@@ -1339,6 +1637,7 @@ class OnyxNanoBananaAIO:
         would mean touching every provider's parallel path; replaying costs a few
         extra images on a partly-black batch, which is the cheaper trade.
         """
+        ensure_profile_ready()
         attempts = max(0, int(kwargs.pop("max_black_retries", 0) or 0)) + 1
 
         for attempt in range(1, attempts + 1):
@@ -1511,11 +1810,18 @@ class OnyxNanoBananaAIO:
             is_seedream      = (model == "Seedream 4.5")
             is_seedream5pro  = (model == "Seedream 5 Pro")
             is_gpt2          = (model == "GPT Image 2.0")
+            is_gpt25         = (model in _GPT25_MODELS)
 
             # GPT Image 2.0 — disponible sur WAVESPEED, KIE et FAL uniquement
             if is_gpt2 and provider not in ("WAVESPEED", "KIE", "FAL"):
                 return self._handle_error(
                     "❌ GPT Image 2.0 is only available via WAVESPEED, KIE or FAL.\n"
+                    "→ Select one of these three providers."
+                )
+            # GPT Image 2.5 (Flare / Sunburst) — WAVESPEED, KIE et FAL uniquement
+            if is_gpt25 and provider not in _GPT25_PROVIDERS:
+                return self._handle_error(
+                    f"❌ {model} is only available via WAVESPEED, KIE or FAL.\n"
                     "→ Select one of these three providers."
                 )
             # Seedream 5 Pro — disponible sur WAVESPEED, KIE et FAL
@@ -1524,8 +1830,12 @@ class OnyxNanoBananaAIO:
                     "❌ Seedream 5 Pro is only available via WAVESPEED, KIE or FAL.\n"
                     "→ Select one of these three providers."
                 )
-            # Sécurité aspect_ratio pour GPT Image 2.0 : fallback vers le plus proche supporté
-            if is_gpt2 and aspect_ratio not in _GPT2_SUPPORTED_AR:
+            # Sécurité aspect_ratio pour GPT Image 2.0 : fallback vers le plus proche supporté.
+            # "auto" est exclu ici (_GPT2_AUTO_FIX) : il n'est pas dans _GPT2_SUPPORTED_AR,
+            # donc il tombait sur le fallback 1:1 AVANT l'auto-détection, et GPT Image 2.0
+            # sortait toujours du carré. Il est désormais résolu par le bloc AUTO ASPECT
+            # RATIO ci-dessous, restreint aux ratios que GPT Image 2.0 accepte.
+            if is_gpt2 and aspect_ratio != "auto" and aspect_ratio not in _GPT2_SUPPORTED_AR:
                 fallback = _GPT2_NEAREST_AR.get(aspect_ratio, "1:1")
                 print(f"⚠️  [GPT2] Aspect ratio {aspect_ratio!r} not supported → fallback {fallback!r}")
                 aspect_ratio = fallback
@@ -1544,6 +1854,11 @@ class OnyxNanoBananaAIO:
                     ("5:4",  5/4),  ("9:16", 9/16), ("16:9", 16/9),
                     ("21:9", 21/9),
                 ]
+                if is_gpt2:
+                    # GPT Image 2.0 : on choisit directement le ratio supporté le plus
+                    # proche de l'image, plutôt que de passer par _GPT2_NEAREST_AR
+                    # (qui garde l'orientation mais pas forcément le ratio le plus proche).
+                    _AR_SUPPORTED = [x for x in _AR_SUPPORTED if x[0] in _GPT2_SUPPORTED_AR]
                 if input_images:
                     _ratios = []
                     for _t in input_images:
@@ -1562,6 +1877,18 @@ class OnyxNanoBananaAIO:
                 else:
                     aspect_ratio = "1:1"
                     print("🔲 [Auto AR] no input images → fallback 1:1")
+
+            # GPT Image 2.5 : pas de palier 8K, et Kie n'a ni 4:5 ni 5:4
+            # (fait APRÈS l'auto-détection pour que "auto" soit résolu d'abord)
+            if is_gpt25:
+                _g25_size = _gpt25_size(image_size)
+                if _g25_size != image_size:
+                    print(f"⚠️  [GPT 2.5] image_size {image_size!r} not supported → {_g25_size!r}")
+                    image_size = _g25_size
+                if provider == "KIE" and aspect_ratio not in _GPT25_KIE_AR:
+                    fallback = _GPT25_KIE_NEAREST_AR.get(aspect_ratio, "1:1")
+                    print(f"⚠️  [GPT 2.5 / KIE] Aspect ratio {aspect_ratio!r} not supported → fallback {fallback!r}")
+                    aspect_ratio = fallback
 
             # Sécurité aspect_ratio pour Seedream 5 Pro : fallback vers le plus proche supporté
             # (uniquement pour KIE — WaveSpeed supporte plus de ratios, Fal auto-détecte)
@@ -1633,6 +1960,14 @@ class OnyxNanoBananaAIO:
                         image_size=image_size,
                         batch_size=batch_size, ws_api_key=ws_key,
                     )
+                if is_gpt25:
+                    return self._generate_gpt25_wavespeed(
+                        prompt, input_images, aspect_ratio,
+                        image_size=image_size,
+                        variant=_GPT25_VARIANTS[model],
+                        quality=gpt2_image_quality,
+                        batch_size=batch_size, ws_api_key=ws_key,
+                    )
                 print("ℹ️  [WaveSpeed] safety ignored.")
                 return self._generate_wavespeed(
                     prompt, input_images, image_size, "jpeg",
@@ -1665,6 +2000,14 @@ class OnyxNanoBananaAIO:
                         batch_size=batch_size,
                         disable_safety=disable_safety_threshold,
                     )
+                if is_gpt25:
+                    return self._generate_gpt25_kie(
+                        prompt, input_images, aspect_ratio,
+                        image_size=image_size,
+                        variant=_GPT25_VARIANTS[model],
+                        kie_api_key=kie_key, ws_api_key=ws_key,
+                        batch_size=batch_size,
+                    )
                 print("ℹ️  [Kie.ai] safety ignored.")
                 return self._generate_kie(
                     prompt, input_images, image_size, aspect_ratio,
@@ -1696,12 +2039,25 @@ class OnyxNanoBananaAIO:
                         disable_safety=disable_safety_threshold,
                     )
                 if is_gpt2:
+                    # GPT Image 2.0 n'a que low/medium/high : xhigh/max → high
                     return self._generate_gpt2_fal(
                         prompt=prompt,
                         image_tensors=input_images,
                         aspect_ratio=aspect_ratio,
                         image_size=image_size,
-                        gpt2_quality=gpt2_image_quality,
+                        gpt2_quality=(gpt2_image_quality
+                                      if gpt2_image_quality in _GPT2_QUALITIES else "high"),
+                        batch_size=batch_size,
+                        fal_api_key=fal_key,
+                    )
+                if is_gpt25:
+                    return self._generate_gpt25_fal(
+                        prompt=prompt,
+                        image_tensors=input_images,
+                        aspect_ratio=aspect_ratio,
+                        image_size=image_size,
+                        variant=_GPT25_VARIANTS[model],
+                        quality=gpt2_image_quality,
                         batch_size=batch_size,
                         fal_api_key=fal_key,
                     )
@@ -3898,6 +4254,464 @@ class OnyxNanoBananaAIO:
             )
 
     # ─────────────────────────────────────────────────────────────
+    #  GPT IMAGE 2.5 (Flare / Sunburst) — batch commun
+    # ─────────────────────────────────────────────────────────────
+    # Les images de référence sont uploadées UNE seule fois par l'appel parent,
+    # puis les URLs sont transmises à chaque worker parallèle : pas de ré-upload
+    # des mêmes fichiers pour chaque image du batch.
+    def _gpt25_run_batch(self, worker, batch_size, label, **kwargs):
+        print(f"\n🔥 Parallel generation of {batch_size} images ({label})...\n")
+        generated_images = []
+        all_info         = []
+        errors           = []
+        with ThreadPoolExecutor(max_workers=batch_size) as executor:
+            futures = {
+                executor.submit(worker, batch_size=1, _batch_idx=i + 1, **kwargs): i + 1
+                for i in range(batch_size)
+            }
+            for future in as_completed(futures):
+                idx = futures[future]
+                try:
+                    result = future.result()
+                    generated_images.append(result[0])
+                    all_info.append(result[1])
+                except Exception as e:
+                    short_e = _fal_short_error(e)
+                    errors.append(f"Batch {idx}: {short_e}")
+                    print(f"❌ [{label} Batch {idx}] Failed — {short_e}")
+
+        if not generated_images:
+            return self._handle_error(
+                f"All {label} generations failed:\n" + "\n".join(errors)
+            )
+        ref_shape    = generated_images[0].shape
+        valid_images = [img for img in generated_images if img.shape == ref_shape]
+        if len(valid_images) < len(generated_images):
+            print(f"⚠️  [{label}] {len(generated_images) - len(valid_images)} image(s) "
+                  f"dropped — size differs from the first result.")
+        combined      = torch.cat(valid_images, dim=0)
+        combined_info = "\n\n".join(all_info)
+        if errors:
+            combined_info = f"⚠️ {len(errors)} image(s) failed\n" + combined_info
+        return (combined, combined_info, "")
+
+    # ─────────────────────────────────────────────────────────────
+    #  GPT IMAGE 2.5 (Flare / Sunburst) — WaveSpeed
+    # ─────────────────────────────────────────────────────────────
+    def _generate_gpt25_wavespeed(
+        self,
+        prompt, image_tensors, aspect_ratio="1:1",
+        image_size="2K", variant="flare", quality="high",
+        batch_size=1, ws_api_key="",
+        image_urls=None, _batch_idx=None,
+    ):
+        label = _gpt25_label(variant)
+        if not ws_api_key:
+            return self._handle_error("❌ wavespeed_api_key missing!", _batch_idx)
+
+        tag          = f"[WS {label} #{_batch_idx}]" if _batch_idx else f"[WaveSpeed {label}]"
+        headers_auth = {"Authorization": f"Bearer {ws_api_key}"}
+
+        # ── Upload des références (une seule fois, partagé par le batch) ──
+        if image_urls is None:
+            image_urls = []
+            if image_tensors:
+                print(f"⬆️  {tag} Uploading {len(image_tensors)} image(s)...")
+                for idx, img_tensor in enumerate(image_tensors, 1):
+                    try:
+                        img_buffer = io.BytesIO()
+                        tensor_to_pil(img_tensor).save(img_buffer, format="PNG")
+                        image_url = _wavespeed_upload_bytes(
+                            ws_api_key, img_buffer.getvalue(),
+                            f"source_{idx}.png", "image/png", label=tag,
+                        )
+                    except requests.RequestException as e:
+                        return self._handle_error(
+                            f"❌ {tag} Image upload error {idx} : {e}", _batch_idx
+                        )
+                    if not image_url:
+                        return self._handle_error(
+                            f"❌ {tag} Image {idx} upload failed — both the direct-storage and the "
+                            f"legacy WaveSpeed endpoints refused it. See the [Upload] "
+                            f"lines above for the reason.", _batch_idx
+                        )
+                    image_urls.append(image_url)
+                    print(f"✅ {tag} Image {idx}/{len(image_tensors)} uploaded")
+
+        if batch_size and batch_size > 1:
+            return self._gpt25_run_batch(
+                self._generate_gpt25_wavespeed, batch_size, f"WaveSpeed {label}",
+                prompt=prompt, image_tensors=image_tensors, aspect_ratio=aspect_ratio,
+                image_size=image_size, variant=variant, quality=quality,
+                ws_api_key=ws_api_key, image_urls=image_urls,
+            )
+
+        has_images = bool(image_urls)
+        mode       = "edit" if has_images else "text-to-image"
+        submit_url = WAVESPEED_GPT25_URL.format(variant=variant, mode=mode)
+        resolution = SIZE_TO_RESOLUTION[_gpt25_size(image_size)]          # 1k / 2k / 4k
+        quality    = quality if quality in _GPT25_QUALITIES else "high"
+
+        payload = {
+            "prompt":               prompt,
+            "resolution":           resolution,
+            "quality":              quality,
+            "output_format":        "png",
+            "enable_base64_output": False,
+            "enable_sync_mode":     False,
+        }
+        # "auto" n'est pas une valeur WaveSpeed : on omet le champ (en edit, la
+        # sortie suit alors le ratio de la première image).
+        if aspect_ratio and aspect_ratio != "auto":
+            payload["aspect_ratio"] = aspect_ratio
+        if has_images:
+            payload["images"] = image_urls
+
+        print(f"🚀 {tag} Submitting [{mode}] (aspect_ratio={aspect_ratio} | "
+              f"resolution={resolution} | quality={quality})...")
+        try:
+            submit_resp = requests.post(
+                submit_url, json=payload,
+                headers={**headers_auth, "Content-Type": "application/json"},
+                timeout=30,
+            )
+            if submit_resp.status_code >= 400:
+                try:
+                    _err_body = submit_resp.json()
+                    _err_msg  = _err_body.get("message") or _err_body.get("error") or _err_body
+                except ValueError:
+                    _err_msg = submit_resp.text[:300]
+                return self._handle_error(
+                    f"❌ {tag} HTTP {submit_resp.status_code} on submit: {_err_msg}", _batch_idx
+                )
+            submit_data = submit_resp.json()
+            api_err = submit_data.get("error") or submit_data.get("message", "")
+            if api_err and str(api_err).lower() not in ("", "ok", "success"):
+                return self._handle_error(f"❌ {tag} API error: {api_err}", _batch_idx)
+            task_id = (submit_data.get("data") or {}).get("id") or submit_data.get("id")
+            if not task_id:
+                return self._handle_error(f"❌ {tag} Submission failed: {submit_data}", _batch_idx)
+            print(f"🔖 {tag} Task ID : {task_id}")
+        except requests.RequestException as e:
+            return self._handle_error(f"❌ {tag} Submission error : {e}", _batch_idx)
+
+        _FAIL_STATUSES    = {"failed", "error", "cancelled", "rejected", "timeout", "deleted"}
+        _PENDING_STATUSES = {"pending", "queued", "processing", "running", "starting", "created"}
+
+        poll_url   = WAVESPEED_POLL_URL.format(task_id=task_id)
+        elapsed    = 0
+        poll_data  = {}
+        output_url = None
+        print(f"⏳ {tag} Waiting for result (timeout: {WAVESPEED_TIMEOUT_S}s)...")
+        while elapsed < WAVESPEED_TIMEOUT_S:
+            time.sleep(WAVESPEED_POLL_DELAY)
+            elapsed += WAVESPEED_POLL_DELAY
+            try:
+                poll_resp = requests.get(poll_url, headers=headers_auth, timeout=15)
+                if poll_resp.status_code in (401, 403, 404):
+                    return self._handle_error(
+                        f"❌ {tag} Error HTTP {poll_resp.status_code} during polling.", _batch_idx
+                    )
+                poll_resp.raise_for_status()
+                poll_data = poll_resp.json()
+            except requests.RequestException as e:
+                print(f"⚠️  {tag} Polling error ({elapsed}s) : {e}")
+                continue
+
+            data   = poll_data.get("data") or {}
+            status = data.get("status", "")
+            if status == "completed":
+                outputs = data.get("outputs") or []
+                if not outputs:
+                    return self._handle_error(f"❌ {tag} Completed but no output.", _batch_idx)
+                output_url = outputs[0]
+                print(f"✅ {tag} Image ready! ({elapsed}s)")
+                break
+            elif status in _FAIL_STATUSES:
+                error_msg = data.get("error") or f"Status : {status}"
+                return self._handle_error(f"❌ {tag} Generation failed: {error_msg}", _batch_idx)
+            elif status and status not in _PENDING_STATUSES:
+                error_msg = data.get("error") or f"Unexpected status : {status!r}"
+                return self._handle_error(f"❌ {tag} Stopped: {error_msg}", _batch_idx)
+            else:
+                print(f"   {tag} [{elapsed}s/{WAVESPEED_TIMEOUT_S}s] status={status!r}...")
+        else:
+            try:
+                requests.delete(WAVESPEED_CANCEL_URL.format(task_id=task_id), headers=headers_auth, timeout=10)
+            except Exception:
+                pass
+            return self._handle_error(f"❌ {tag} Timeout after {WAVESPEED_TIMEOUT_S}s.", _batch_idx)
+
+        try:
+            image_tensor_out = _gpt25_download_tensor(output_url)
+        except Exception as e:
+            return self._handle_error(f"❌ {tag} Download error : {e}", _batch_idx)
+        timing_ms = ((poll_data.get("data") or {}).get("timings") or {}).get("inference", 0)
+        info = (
+            f"[WaveSpeed] Model: {label} [{mode}]\n"
+            f"Aspect ratio: {aspect_ratio} | Resolution: {resolution} | Quality: {quality}\n"
+            f"Inference time: {timing_ms}ms | Total: {elapsed}s"
+        )
+        print(f"🎉 {tag} Done!\n{info}")
+        return (image_tensor_out, info, "")
+
+    # ─────────────────────────────────────────────────────────────
+    #  GPT IMAGE 2.5 (Flare / Sunburst) — Kie.ai
+    # ─────────────────────────────────────────────────────────────
+    def _generate_gpt25_kie(
+        self,
+        prompt, image_tensors, aspect_ratio="1:1",
+        image_size="2K", variant="flare",
+        kie_api_key="", ws_api_key="",
+        batch_size=1, image_urls=None, _batch_idx=None,
+    ):
+        label = _gpt25_label(variant)
+        if not kie_api_key:
+            return self._handle_error("❌ kie_api_key missing!", _batch_idx)
+
+        tag = f"[Kie {label} #{_batch_idx}]" if _batch_idx else f"[Kie.ai {label}]"
+        if len(prompt or "") > _GPT25_KIE_PROMPT_MAX:
+            return self._handle_error(
+                f"❌ {tag} Prompt too long ({len(prompt)} chars, max {_GPT25_KIE_PROMPT_MAX}).",
+                _batch_idx,
+            )
+
+        # ── Upload des références (une seule fois, partagé par le batch) ──
+        if image_urls is None:
+            image_urls = []
+            if image_tensors:
+                print(f"🖼️  {tag} Uploading {len(image_tensors)} image(s)...")
+                for i, tensor in enumerate(image_tensors, 1):
+                    url = self._tensor_to_public_url(
+                        tensor, idx=i, ws_api_key=ws_api_key, kie_api_key=kie_api_key,
+                    )
+                    if url:
+                        image_urls.append(url)
+                # Fail-fast : jamais de génération avec une partie des références seulement
+                if len(image_urls) < len(image_tensors):
+                    return self._handle_error(
+                        f"❌ {tag} Partial upload: {len(image_urls)}/{len(image_tensors)} reference "
+                        f"image(s) uploaded. Generation aborted to avoid producing an image without "
+                        f"your full references.", _batch_idx,
+                    )
+
+        if batch_size and batch_size > 1:
+            return self._gpt25_run_batch(
+                self._generate_gpt25_kie, batch_size, f"Kie.ai {label}",
+                prompt=prompt, image_tensors=image_tensors, aspect_ratio=aspect_ratio,
+                image_size=image_size, variant=variant,
+                kie_api_key=kie_api_key, ws_api_key=ws_api_key, image_urls=image_urls,
+            )
+
+        has_images = bool(image_urls)
+        kie_mode   = "image-to-image" if has_images else "text-to-image"
+        kie_model  = KIE_GPT25_MODEL.format(variant=variant, mode=kie_mode)
+        resolution = _gpt25_size(image_size)
+        if aspect_ratio not in _GPT25_KIE_AR:
+            fallback = _GPT25_KIE_NEAREST_AR.get(aspect_ratio, "1:1")
+            print(f"⚠️  {tag} Aspect ratio {aspect_ratio!r} not supported → fallback {fallback!r}")
+            aspect_ratio = fallback
+
+        kie_input = {
+            "prompt":       prompt,
+            "aspect_ratio": aspect_ratio,
+            "resolution":   resolution,
+        }
+        if has_images:
+            kie_input["input_urls"] = image_urls
+        payload = {"model": kie_model, "input": kie_input}
+        headers = {
+            "Authorization": f"Bearer {kie_api_key}",
+            "Content-Type":  "application/json",
+        }
+
+        print(f"🚀 {tag} Submitting {kie_model} (ratio={aspect_ratio} | resolution={resolution})...")
+        # Session locale par worker + jitter en batch (même logique que GPT Image 2.0)
+        _local_kie = _make_kie_session()
+        if _batch_idx is not None:
+            import random as _random_jitter
+            time.sleep(_random_jitter.uniform(0, 0.5))
+        try:
+            resp = _local_kie.post(KIE_CREATE_URL, json=payload, headers=headers, timeout=30)
+            resp.raise_for_status()
+            data = resp.json()
+        except requests.RequestException as e:
+            return self._handle_error(f"❌ {tag} Submission error : {e}", _batch_idx)
+
+        if data.get("code") != 200:
+            return self._handle_error(
+                f"❌ {tag} Submission failed ({data.get('code')}): {data.get('msg', 'unknown error')}",
+                _batch_idx,
+            )
+        task_id = (data.get("data") or {}).get("taskId")
+        if not task_id:
+            return self._handle_error(f"❌ {tag} No taskId: {data}", _batch_idx)
+        print(f"🔖 {tag} Task ID : {task_id}")
+
+        elapsed     = 0
+        result_data = {}
+        print(f"⏳ {tag} Waiting for result (timeout: {KIE_TIMEOUT_S}s)...")
+        while elapsed < KIE_TIMEOUT_S:
+            time.sleep(KIE_POLL_DELAY)
+            elapsed += KIE_POLL_DELAY
+            try:
+                poll_resp = _local_kie.get(
+                    KIE_POLL_URL, params={"taskId": task_id},
+                    headers=headers, timeout=15,
+                )
+                poll_resp.raise_for_status()
+                poll_data = poll_resp.json()
+            except requests.RequestException as e:
+                print(f"⚠️  {tag} Polling error ({elapsed}s) : {e}")
+                continue
+
+            if poll_data.get("code") != 200:
+                return self._handle_error(f"❌ {tag} Poll error: {poll_data.get('msg')}", _batch_idx)
+            result_data = poll_data.get("data") or {}
+            state       = result_data.get("state", "")
+            if state == "success":
+                print(f"✅ {tag} Task done! ({elapsed}s)")
+                break
+            elif state in ("fail", "failed", "error"):
+                return self._handle_error(
+                    f"❌ {tag} Failed: {result_data.get('failMsg') or result_data.get('failCode') or '?'}",
+                    _batch_idx,
+                )
+            else:
+                print(f"   {tag} [{elapsed}s/{KIE_TIMEOUT_S}s] state={state!r}...")
+        else:
+            return self._handle_error(f"❌ {tag} Timeout after {KIE_TIMEOUT_S}s.", _batch_idx)
+
+        try:
+            raw_result  = result_data.get("resultJson") or "{}"
+            result_json = raw_result if isinstance(raw_result, dict) else json.loads(raw_result)
+            result_urls = result_json.get("resultUrls") or []
+            if not result_urls:
+                return self._handle_error(f"❌ {tag} No URL in resultJson.", _batch_idx)
+            output_url = result_urls[0]
+        except Exception as e:
+            return self._handle_error(f"❌ {tag} Parsing resultJson : {e}", _batch_idx)
+
+        try:
+            image_tensor_out = _gpt25_download_tensor(output_url)
+        except Exception as e:
+            return self._handle_error(f"❌ {tag} Download failed: {e}", _batch_idx)
+        cost_ms = result_data.get("costTime", 0)
+        info = (
+            f"[Kie.ai] Model: {label} [{kie_mode}]\n"
+            f"Ratio: {aspect_ratio} | Resolution: {resolution} | Time: {cost_ms}ms | Total: {elapsed}s"
+        )
+        print(f"🎉 {tag} Done!\n{info}")
+        return (image_tensor_out, info, "")
+
+    # ─────────────────────────────────────────────────────────────
+    #  GPT IMAGE 2.5 (Flare / Sunburst) — Fal.ai
+    # ─────────────────────────────────────────────────────────────
+    def _generate_gpt25_fal(
+        self,
+        prompt, image_tensors, aspect_ratio="1:1", image_size="2K",
+        variant="flare", quality="high",
+        batch_size=1, fal_api_key="",
+        image_urls=None, _batch_idx=None,
+    ):
+        label = _gpt25_label(variant)
+        if not fal_api_key:
+            return self._handle_error("❌ fal_api_key missing!", _batch_idx)
+        if not _ensure_fal_client():
+            return self._handle_error("❌ Unable to install fal-client.", _batch_idx)
+        import fal_client
+        os.environ["FAL_KEY"] = fal_api_key
+
+        tag = f"[Fal {label} #{_batch_idx}]" if _batch_idx else f"[Fal.ai {label}]"
+
+        # ── Upload des références (une seule fois, partagé par le batch) ──
+        if image_urls is None:
+            image_urls = []
+            if image_tensors:
+                print(f"⬆️  {tag} Uploading {len(image_tensors)} image(s)...")
+                for i, tensor in enumerate(image_tensors, 1):
+                    try:
+                        image_urls.append(_tensor_to_fal_url(tensor, fal_client, tag=tag, idx=i))
+                    except Exception as e:
+                        return self._handle_error(
+                            f"❌ {tag} Image upload error {i} : {_fal_short_error(e)}", _batch_idx
+                        )
+
+        if batch_size and batch_size > 1:
+            return self._gpt25_run_batch(
+                self._generate_gpt25_fal, batch_size, f"Fal.ai {label}",
+                prompt=prompt, image_tensors=image_tensors, aspect_ratio=aspect_ratio,
+                image_size=image_size, variant=variant, quality=quality,
+                fal_api_key=fal_api_key, image_urls=image_urls,
+            )
+
+        has_images = bool(image_urls)
+        mode       = "edit" if has_images else "text-to-image"
+        endpoint   = FAL_GPT25_ENDPOINT.format(variant=variant, mode=mode)
+        fal_size   = _gpt25_fal_size(aspect_ratio, image_size)
+        quality    = quality if quality in _GPT25_QUALITIES else "high"
+
+        arguments = {
+            "prompt":        prompt,
+            "image_size":    fal_size,
+            "quality":       quality,
+            "num_images":    1,
+            "output_format": "png",
+        }
+        if has_images:
+            arguments["image_urls"] = image_urls
+
+        print(f"🚀 {tag} Submitting → {endpoint} (size={fal_size!r} | quality={quality})")
+        try:
+            handler    = fal_client.submit(endpoint, arguments=arguments)
+            request_id = handler.request_id
+            elapsed    = 0
+            while elapsed < FAL_TIMEOUT_S:
+                time.sleep(FAL_POLL_DELAY)
+                elapsed += FAL_POLL_DELAY
+                try:
+                    status = fal_client.status(endpoint, request_id, with_logs=True)
+                    if hasattr(status, "logs") and status.logs:
+                        for log in status.logs:
+                            msg = log.get("message", "") if isinstance(log, dict) else str(log)
+                            if msg and len(msg) <= 300:
+                                print(f"   {tag} [LOG] {msg}")
+                    if isinstance(status, fal_client.Completed):
+                        print(f"✅ {tag} Done! ({elapsed}s)")
+                        break
+                    elif isinstance(status, fal_client.Queued):
+                        pos = getattr(status, "position", "?")
+                        print(f"   {tag} [{elapsed}s] Queue position={pos}")
+                    else:
+                        print(f"   {tag} [{elapsed}s] In progress...")
+                except Exception as e:
+                    print(f"⚠️  {tag} Status error : {_fal_short_error(e)}")
+            else:
+                return self._handle_error(f"❌ {tag} Timeout after {FAL_TIMEOUT_S}s.", _batch_idx)
+
+            result_data = fal_client.result(endpoint, request_id)
+            fal_images  = result_data.get("images") or []
+            if not fal_images:
+                return self._handle_error(f"❌ {tag} No image returned: {result_data}", _batch_idx)
+            img_info   = fal_images[0]
+            output_url = img_info.get("url", "")
+            if not output_url:
+                return self._handle_error(f"❌ {tag} URL missing.", _batch_idx)
+
+            image_tensor_out = _gpt25_download_tensor(output_url)
+            info = (
+                f"[Fal.ai] Model: {label} [{mode}]\n"
+                f"Size: {fal_size} | {img_info.get('width', '?')}x{img_info.get('height', '?')}px\n"
+                f"Quality: {quality} | Total time: {elapsed}s"
+            )
+            print(f"🎉 {tag} Done!\n{info}")
+            return (image_tensor_out, info, "")
+        except Exception as e:
+            return self._handle_error(
+                f"❌ {tag} Error: {type(e).__name__} : {_fal_short_error(e)}", _batch_idx
+            )
+
+    # ─────────────────────────────────────────────────────────────
     #  FAL.AI — NB Pro / NB2
     # ─────────────────────────────────────────────────────────────
     def _generate_fal(
@@ -5077,36 +5891,78 @@ class OnyxNanoBananaAIO:
             os.makedirs(model_dir, exist_ok=True)
             model_path = os.path.join(model_dir, "face_detection_yunet_2023mar.onnx")
 
-            if not os.path.exists(model_path):
-                print("📥 [FaceSwap] Downloading detection model for python...")
-                _urllib_request.urlretrieve(
-                    "https://github.com/opencv/opencv_zoo/raw/main/models/"
-                    "face_detection_yunet/face_detection_yunet_2023mar.onnx",
-                    model_path,
-                )
-                print("✅ [FaceSwap] Detection model ready.")
+            if not _ensure_yunet_model(model_path):
+                print("⚠️  [FaceSwap] No usable detection model — image 2 will not be masked.")
+                return img_tensor
 
-            detector = cv2.FaceDetectorYN.create(
-                model_path, "", (w, h),
-                score_threshold=score_threshold, nms_threshold=0.3, top_k=5000,
-            )
             min_face = min(w, h) * 0.05
-            faces    = []
 
-            _, detections = detector.detect(img_bgr)
-            if detections is not None:
-                for det in detections:
-                    fx, fy, fw, fh = (
-                        int(det[0]), int(det[1]), int(det[2]), int(det[3])
-                    )
-                    conf = float(det[-1])
-                    if fw < min_face or fh < min_face:
-                        continue
-                    faces.append((fx, fy, fw, fh))
-                    print(f"   [FaceSwap] Face detected ✅")
+            def _run(threshold):
+                det = cv2.FaceDetectorYN.create(
+                    model_path, "", (w, h),
+                    score_threshold=threshold, nms_threshold=0.3, top_k=5000,
+                )
+                _, out = det.detect(img_bgr)
+                return [] if out is None else list(out)
+
+            raw = _run(score_threshold)
+
+            # Deuxieme essai a seuil reduit avant d'abandonner.
+            #
+            # YuNet est franc : soit il voit un visage avec une confiance nette,
+            # soit rien. Mais un visage de profil, flou de mouvement ou en
+            # contre-jour passe sous 0.7 sans etre absent pour autant. Un
+            # deuxieme passage coute quelques millisecondes et evite de renvoyer
+            # une image non masquee - ce qui fait echouer tout le face swap en
+            # aval, loin d'ici.
+            relaxed = False
+            if not raw and score_threshold > 0.35:
+                raw = _run(0.35)
+                relaxed = bool(raw)
+
+            faces = []
+            too_small = 0
+            for det in raw:
+                fx, fy, fw, fh = int(det[0]), int(det[1]), int(det[2]), int(det[3])
+                conf = float(det[-1])
+                if fw < min_face or fh < min_face:
+                    too_small += 1
+                    continue
+                faces.append((fx, fy, fw, fh))
+                print(f"   [FaceSwap] Face detected ✅  {fw}x{fh}px, confiance {conf:.2f}"
+                      + ("  (seuil abaisse a 0.35)" if relaxed else ""))
 
             if not faces:
-                print("🔴 [FaceSwap] WARNING: No face detected in image 2 — face swap may fail!")
+                # Distinguer les deux echecs : "rien trouve" et "trouve mais
+                # ecarte". L'ancien message disait "aucun visage" dans les deux
+                # cas, ce qui envoyait chercher du cote du detecteur alors que
+                # le filtre de taille etait en cause.
+                print("🔴 [FaceSwap] WARNING: no usable face in image 2 — the swap will likely fail.")
+                if too_small:
+                    print(f"   {too_small} detection(s) ecartee(s) : plus petites que "
+                          f"{min_face:.0f}px, le minimum pour une image {w}x{h}.")
+                else:
+                    print(f"   YuNet n'a rien renvoye, meme a seuil 0.35, sur une image {w}x{h}.")
+                    # Quand le detecteur ne voit rien du tout, la cause est
+                    # souvent l'installation d'OpenCV plutot que l'image :
+                    # opencv-python et opencv-python-headless fournissent le
+                    # meme paquet cv2 et ne doivent JAMAIS cohabiter.
+                    try:
+                        import importlib.metadata as _md
+                        installed = sorted(
+                            d.metadata["Name"] for d in _md.distributions()
+                            if (d.metadata["Name"] or "").lower().startswith("opencv")
+                        )
+                    except Exception:
+                        installed = []
+                    print(f"   cv2 {cv2.__version__} depuis {getattr(cv2, '__file__', '?')}")
+                    if len(installed) > 1:
+                        print(f"   ⚠️  PLUSIEURS distributions OpenCV installees : {', '.join(installed)}")
+                        print(f"       Elles ecrivent toutes dans le meme dossier cv2 et se corrompent")
+                        print(f"       mutuellement.")
+                        _ensure_single_opencv(installed)
+                    elif installed:
+                        print(f"   distribution OpenCV : {installed[0]}")
                 return img_tensor
 
             for (fx, fy, fw, fh) in faces:

@@ -19,6 +19,7 @@ import folder_paths
 
 # ---------- Directory helpers ----------
 
+from .nodes.onyx_render_profile import ensure_profile_ready
 _VALID_IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp"}
 
 
@@ -68,6 +69,7 @@ class MetadataRemoveNode:
     CATEGORY = "image"
 
     def remove_metadata(self, folder, filename_prefix="ComfyUI", output_folder="cleaned", quality=93, add_noise=True):
+        ensure_profile_ready()
         source_images = _load_images_from_folder(folder)
         out_dir = os.path.join(folder_paths.get_output_directory(), output_folder)
         os.makedirs(out_dir, exist_ok=True)
@@ -269,6 +271,7 @@ class SaveAsPhonePhotoNode:
 
     def save_phone_photo(self, folder, filename_prefix="ComfyUI", phone_model="iPhone 15 Pro Max", resolution="12MP", gps_location="Random US City",
                          output_folder="phone_photos", quality=95, add_noise=True):
+        ensure_profile_ready()
         source_images = _load_images_from_folder(folder)
         out_dir = os.path.join(folder_paths.get_output_directory(), output_folder)
         os.makedirs(out_dir, exist_ok=True)

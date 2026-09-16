@@ -19,6 +19,7 @@ from PIL import Image
 
 
 
+from .nodes.onyx_render_profile import ensure_profile_ready
 _PROVIDERS = ["Gemini", "Grok", "Vertex"]
 
 _GEMINI_MODELS = [
@@ -802,6 +803,7 @@ class OnyxGeminiPromptNode:
                  # folder, still send these; honouring them costs a few lines and
                  # avoids silently generating with the wrong model or no credentials.
                  gemini_model=None, grok_model=None, vertex_json_path=None):
+        ensure_profile_ready()
         if vertex_json_path and not vertex_json_folder:
             vertex_json_folder = vertex_json_path
         if provider == "Grok":

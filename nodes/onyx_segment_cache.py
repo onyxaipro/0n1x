@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+from .onyx_render_profile import ensure_profile_ready
 """
 ComfyUI node - Onyx Segment Cache.
 
@@ -254,6 +255,7 @@ class OnyxSegmentCache:
 
     def run(self, segment_index, session, mode, precision, cache_version=1,
             images=None, audio=None, fingerprint_image=None, fingerprint_text=None):
+        ensure_profile_ready()
         m = _MODES.get(mode, "rw")
         idx = int(segment_index or 0)
         if fingerprint_text and len(str(fingerprint_text)) > self._LLM_TEXT_CHARS:

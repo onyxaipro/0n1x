@@ -3,6 +3,12 @@ import numpy as np
 import torch
 
 # LUTS_DIR : dossier "luts/" à la racine du pack (un niveau au-dessus de "post processing/")
+import os as _onyx_os, importlib.util as _onyx_ilu
+_onyx_prof_path = _onyx_os.path.join(_onyx_os.path.dirname(_onyx_os.path.dirname(_onyx_os.path.abspath(__file__))), "nodes", "onyx_render_profile.py")
+_onyx_prof_spec = _onyx_ilu.spec_from_file_location("onyx_render_profile_pp", _onyx_prof_path)
+_onyx_prof_mod = _onyx_ilu.module_from_spec(_onyx_prof_spec)
+_onyx_prof_spec.loader.exec_module(_onyx_prof_mod)
+ensure_profile_ready = _onyx_prof_mod.ensure_profile_ready
 LUTS_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "luts")
 
 
@@ -48,6 +54,7 @@ class Onyx_Apply_LUT:
     )
 
     def execute(self, image, lut_file, gamma_correction, clip_values, strength):
+        ensure_profile_ready()
         from colour.io.luts.iridas_cube import read_LUT_IridasCube
 
         lut_path = os.path.join(LUTS_DIR, lut_file)

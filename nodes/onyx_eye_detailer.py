@@ -42,6 +42,7 @@ import torchvision.transforms.functional as TF
 import nodes
 import comfy.samplers
 
+from .onyx_render_profile import ensure_profile_ready
 try:
     from comfy_extras import nodes_differential_diffusion
 except Exception:
@@ -228,6 +229,7 @@ class OnyxEyeBBoxDetectorProvider:
     DESCRIPTION = "Copie patchee de Ultralytics Detector Provider : force imgsz=1280 sur l'inference YOLO pour detecter les deux yeux."
 
     def doit(self, model_name, imgsz=1280):
+        ensure_profile_ready()
         import folder_paths
         subcore = _get_subcore()
 
@@ -841,6 +843,7 @@ class OnyxDetailer:
              sam_model_opt=None, segm_detector_opt=None, detailer_hook=None, inpaint_model=False, noise_mask_feather=0,
              scheduler_func_opt=None, tiled_encode=False, tiled_decode=False, segs=None):
 
+        ensure_profile_ready()
         result_img = None
         result_mask = None
         result_cropped_enhanced = []

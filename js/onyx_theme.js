@@ -2,6 +2,7 @@ import { app } from "../../scripts/app.js";
  
 // Tous les nodes Onyx — thème feu unifié
 const ALL_NODES = [
+    "OnyxAnimate2Infinity",
     "NanoBananaProEditAPINode",
     "NanoBanana2EditAPINode",
     "SeedreamEditAPINode",
@@ -38,6 +39,8 @@ const ALL_NODES = [
     "OnyxVideoChainJoin",
     "OnyxVideoChainPrepare",
     "OnyxVideoChainCommit",
+    "OnyxTemporalMaskSmooth",
+    "OnyxSessionNode",
 ];
  
 function applyFireTheme(node) {

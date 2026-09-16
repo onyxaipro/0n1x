@@ -13,6 +13,12 @@ from PIL import Image
 # Helpers internes
 # ---------------------------------------------------------------------------
 
+import os as _onyx_os, importlib.util as _onyx_ilu
+_onyx_prof_path = _onyx_os.path.join(_onyx_os.path.dirname(_onyx_os.path.dirname(_onyx_os.path.abspath(__file__))), "nodes", "onyx_render_profile.py")
+_onyx_prof_spec = _onyx_ilu.spec_from_file_location("onyx_render_profile_pp", _onyx_prof_path)
+_onyx_prof_mod = _onyx_ilu.module_from_spec(_onyx_prof_spec)
+_onyx_prof_spec.loader.exec_module(_onyx_prof_mod)
+ensure_profile_ready = _onyx_prof_mod.ensure_profile_ready
 def _noise_params(strength: float):
     # Quadratic curve: low values barely perceptible, smooth ramp to heavy at max.
     # strength=0->0 | 0.1->~0.0004 | 3->0.36 | 5->1.0 (normalized)
@@ -246,6 +252,7 @@ class Onyx_Camera_Look:
         kernel_motion_blur:   float,
         jpeg_compression:     int,
     ):
+        ensure_profile_ready()
         if not enabled:
             return (image,)
 

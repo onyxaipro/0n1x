@@ -10,6 +10,7 @@ import torch
 # ─────────────────────────────────────────────────────────────────────────────
 # Preset definitions
 # ─────────────────────────────────────────────────────────────────────────────
+from .onyx_render_profile import ensure_profile_ready
 REPOSE_PRESETS = [
     "Subtle",
     "Normal",
@@ -274,6 +275,7 @@ class OnyxReposeCarouselNode:
         temperature              = 1.0,
         gpt2_image_quality       = "high",
     ):
+        ensure_profile_ready()
         from .nano_banana_aio import OnyxNanoBananaAIO
 
         aio = OnyxNanoBananaAIO()

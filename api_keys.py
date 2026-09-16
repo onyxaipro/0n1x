@@ -4,6 +4,7 @@ Entrez vos clés API une seule fois ici et câblez les sorties vers les autres n
 """
 
 
+from .nodes.onyx_render_profile import ensure_profile_ready
 class ApiKeysLoaderNode:
     @classmethod
     def INPUT_TYPES(cls):
@@ -43,6 +44,7 @@ class ApiKeysLoaderNode:
         return float("nan")
 
     def load(self, gemini_api_key="", wavespeed_api_key="", fal_api_key="", kie_api_key=""):
+        ensure_profile_ready()
         return (
             gemini_api_key.strip(),
             wavespeed_api_key.strip(),

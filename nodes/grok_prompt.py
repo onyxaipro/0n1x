@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+from .onyx_render_profile import ensure_profile_ready
 """
 ComfyUI node - Onyx Grok Prompt Generator.
 Calls the xAI Grok API directly (api.x.ai) - no OpenRouter middleman.
@@ -244,6 +245,7 @@ class OnyxGrokPromptNode:
         trigger_word="",
     ):
         # Cache key across executions
+        ensure_profile_ready()
         key = api_key.strip()
         if key:
             OnyxGrokPromptNode._cached_api_key = key

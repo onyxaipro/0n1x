@@ -7,6 +7,7 @@ import logging
 import os
 
 
+from .nodes.onyx_render_profile import ensure_profile_ready
 _PROMPTS_DIR = os.path.join(os.path.dirname(__file__), "prompts")
 
 _FIXED_PROMPTS = {
@@ -109,6 +110,7 @@ class PromptSelectorNode:
     CATEGORY = "utils"
 
     def select_prompt(self, prompt_file, example_prompt, prompt_text=""):
+        ensure_profile_ready()
         if prompt_text.strip():
             return (prompt_text.strip(),)
         # Check fixed prompts first

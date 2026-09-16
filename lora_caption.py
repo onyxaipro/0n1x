@@ -18,6 +18,7 @@ from PIL import Image
 import folder_paths
 
 
+from .nodes.onyx_render_profile import ensure_profile_ready
 _SUPPORTED_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp", ".bmp", ".tiff", ".tif"}
 
 
@@ -432,6 +433,7 @@ class OnyxLoraCaptionGeneratorNode:
                        grok_model="grok-4-1-fast-non-reasoning",
                        caption_instruction="", temperature=0.7,
                        max_tokens=8192):
+        ensure_profile_ready()
         if not input_folder or input_folder == "(no folders found)":
             raise RuntimeError("Lora Caption Generator: no input folder selected. Create a subfolder in ComfyUI/input/.")
 

@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+from .onyx_render_profile import ensure_profile_ready
 """
 Onyx Save Image No Metadata
 Saves images exactly like ComfyUI's native SaveImage node but without
@@ -51,6 +52,7 @@ class OnyxSaveImageNoMetadataNode:
 
     def save_images(self, images, filename_prefix="ComfyUI", format="PNG", quality=95):
         # Resolve output path and counter (same logic as native SaveImage)
+        ensure_profile_ready()
         full_output_folder, filename, counter, subfolder, filename_prefix = \
             folder_paths.get_save_image_path(
                 filename_prefix,

@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+from .onyx_render_profile import ensure_profile_ready
 """
 ComfyUI node - Onyx Images to Video (AB_VIDEO).
 
@@ -179,6 +180,7 @@ class OnyxImagesToVideo:
 
     def encode(self, images, fps, quality, filename_prefix,
                audio=None, save_to_output=False):
+        ensure_profile_ready()
         import av
 
         total = int(images.shape[0])

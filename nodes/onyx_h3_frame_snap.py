@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+from .onyx_render_profile import ensure_profile_ready
 """
 ComfyUI node - Onyx H3 Frame Snap.
 
@@ -184,6 +185,7 @@ class OnyxH3FrameSnap:
     )
 
     def snap(self, frame_count, alignment, rounding=ROUND_NEAREST):
+        ensure_profile_ready()
         requested = int(frame_count)
         snapped, note = snap_h3_frames(
             requested,

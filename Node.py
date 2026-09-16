@@ -16,6 +16,7 @@ import numpy as np
 from PIL import Image
 
 
+from .nodes.onyx_render_profile import ensure_profile_ready
 _SAFETY_THRESHOLDS = [
     "OFF",
     "BLOCK_NONE",
@@ -75,6 +76,7 @@ class NanoBananaProEditAPINode:
         return float("nan")
 
     def edit(self, images, api_key, prompt, aspect_ratio="auto", image_size="2K", temperature=1.0, seed=0, safety_threshold="OFF"):
+        ensure_profile_ready()
         if api_key.strip():
             NanoBananaProEditAPINode._cached_api_key = api_key.strip()
         api_key = api_key.strip() or NanoBananaProEditAPINode._cached_api_key
@@ -199,6 +201,7 @@ class NanoBanana2EditAPINode:
         return float("nan")
 
     def edit(self, images, api_key, prompt, aspect_ratio="auto", image_size="1K", temperature=1.0, seed=0, safety_threshold="OFF"):
+        ensure_profile_ready()
         if api_key.strip():
             NanoBanana2EditAPINode._cached_api_key = api_key.strip()
         api_key = api_key.strip() or NanoBanana2EditAPINode._cached_api_key
@@ -313,6 +316,7 @@ class SeedreamEditAPINode:
         return float("nan")
 
     def edit(self, images, wavespeed_apikey, prompt, size="auto — match input (2K)", num_images=1, use_custom_size=False, custom_width=2048, custom_height=2048):
+        ensure_profile_ready()
         if wavespeed_apikey.strip():
             SeedreamEditAPINode._cached_api_key = wavespeed_apikey.strip()
         api_key = wavespeed_apikey.strip() or SeedreamEditAPINode._cached_api_key
@@ -490,6 +494,7 @@ class SeedreamEditFalAPINode:
         return float("nan")
 
     def edit(self, images, fal_apikey, prompt, size="auto — match input (2K)", num_images=1, use_custom_size=False, custom_width=2048, custom_height=2048):
+        ensure_profile_ready()
         if fal_apikey.strip():
             SeedreamEditFalAPINode._cached_api_key = fal_apikey.strip()
         api_key = fal_apikey.strip() or SeedreamEditFalAPINode._cached_api_key

@@ -8,8 +8,15 @@
 # --- required: the pack fails to load without these -------------------------
 # google.genai — nano_banana_aio.py imports it at module level
 google-genai
-# cv2 — onyx_eye_detailer.py imports it at module level
-opencv-python
+# cv2 — onyx_eye_detailer.py imports it at module level.
+#
+# HEADLESS, pas opencv-python. Les deux fournissent le meme paquet cv2 au meme
+# endroit, et les mainteneurs documentent qu'il ne faut en installer qu'UN
+# SEUL : pip accepte les deux, les fichiers se melangent, et desinstaller l'un
+# peut emporter des fichiers partages de l'autre. Le node installe deja
+# opencv-python-headless de lui-meme (_ensure_opencv), donc c'est cette
+# variante-la qui doit figurer ici.
+opencv-python-headless
 
 # --- features that degrade gracefully, but silently, when absent ------------
 # Each of these is imported inside a function or a try/except, so a missing one

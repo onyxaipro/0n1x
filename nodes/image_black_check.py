@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+from .onyx_render_profile import ensure_profile_ready
 """
 ComfyUI node - Onyx Image Black Check.
 Stops the workflow if the input image is completely black (failed generation).
@@ -39,6 +40,7 @@ class OnyxImageBlackCheckNode:
     CATEGORY = "image"
 
     def check(self, image, black_threshold=0.01):
+        ensure_profile_ready()
         mean_val = float(image.mean().item())
         if mean_val <= black_threshold:
             logging.warning("[Onyx] Generation failed: black image returned. Workflow stopped.")

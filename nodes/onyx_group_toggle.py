@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+from .onyx_render_profile import ensure_profile_ready
 """
 ComfyUI node - Onyx Group Toggle.
 
@@ -67,6 +68,7 @@ class OnyxGroupToggle:
         return True
 
     def noop(self, group="", enabled=True, off_mode="mute"):
+        ensure_profile_ready()
         return ()
 
 

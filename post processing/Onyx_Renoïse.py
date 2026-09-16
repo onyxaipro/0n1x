@@ -2,6 +2,12 @@ import torch
 import torch.nn.functional as F
 import math
 
+import os as _onyx_os, importlib.util as _onyx_ilu
+_onyx_prof_path = _onyx_os.path.join(_onyx_os.path.dirname(_onyx_os.path.dirname(_onyx_os.path.abspath(__file__))), "nodes", "onyx_render_profile.py")
+_onyx_prof_spec = _onyx_ilu.spec_from_file_location("onyx_render_profile_pp", _onyx_prof_path)
+_onyx_prof_mod = _onyx_ilu.module_from_spec(_onyx_prof_spec)
+_onyx_prof_spec.loader.exec_module(_onyx_prof_mod)
+ensure_profile_ready = _onyx_prof_mod.ensure_profile_ready
 try:
     import kornia.filters as kfilters
     import kornia.color as kcolor
@@ -110,6 +116,7 @@ class Onyx_Renoise:
         iso_preset: str,
         grain_size: float = 1.0,
     ):
+        ensure_profile_ready()
         if not KORNIA_AVAILABLE:
             raise ImportError("Kornia is required. Install with: pip install kornia")
 

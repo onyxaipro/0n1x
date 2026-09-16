@@ -29,6 +29,7 @@ from .speed_hd_core import (
 )
 
 
+from .onyx_render_profile import ensure_profile_ready
 @torch.no_grad()
 def sample_speed_hd(
     model, x, sigmas, extra_args=None, callback=None, disable=None,
@@ -148,6 +149,7 @@ class OnyxSpeedHDSampler:
         base_sampler, transform, mode, model_preset, scales, delta,
         manual_sigmas, spectrum_A, spectrum_beta, seed,
     ):
+        ensure_profile_ready()
         preset = _PRESETS.get(model_preset)
         if preset is not None:
             A, beta = preset["A"], preset["beta"]

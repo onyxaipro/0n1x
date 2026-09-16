@@ -14,6 +14,7 @@ import numpy as np
 # Constants
 # ─────────────────────────────────────────────────────────────────────────────
 
+from .onyx_render_profile import ensure_profile_ready
 _MODELS = ["Nano Banana Pro", "Nano Banana 2"]
 
 # SOFT mode: input ratio -> ratio we crop the image to before generation
@@ -189,6 +190,7 @@ class OnyxImageEnhancementNode:
         fal_api_key        = "",
         vertex_json_folder = "",
     ):
+        ensure_profile_ready()
         from .nano_banana_aio import OnyxNanoBananaAIO
         aio = OnyxNanoBananaAIO()
 

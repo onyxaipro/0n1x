@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+from .onyx_render_profile import ensure_profile_ready
 """
 ComfyUI node - Onyx Save Video (no metadata).
 
@@ -190,6 +191,7 @@ class OnyxSaveVideoNoMetadata:
 
     def save(self, filename_prefix, method, video=None, video_path=None,
              add_timestamp=True):
+        ensure_profile_ready()
         tag = "[Save Video]"
         src = _resolve(video, video_path)
 

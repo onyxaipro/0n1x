@@ -22,6 +22,7 @@ import torch
 from PIL import Image
 import folder_paths
 
+from .nodes.onyx_render_profile import ensure_profile_ready
 _VIDEO_EXTENSIONS = {".mp4", ".avi", ".mov", ".mkv", ".webm", ".flv", ".wmv", ".m4v"}
 
 
@@ -122,6 +123,7 @@ class OnyxVideoFrameExtractorNode:
         # Prioritaire sur le menu fichier : quand un loader alimente ce node, le
         # menu pointe encore sur un fichier arbitraire, et lire celui-la donnerait
         # un resultat silencieusement faux.
+        ensure_profile_ready()
         if video_frames is not None and int(video_frames.shape[0]) > 0:
             total = int(video_frames.shape[0])
 

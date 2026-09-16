@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+from .onyx_render_profile import ensure_profile_ready
 """
 ComfyUI nodes - Onyx Prompt Saver / Prompt Gallery.
 
@@ -183,6 +184,7 @@ class OnyxPromptSaver:
         return float("nan")
 
     def run(self, prompt, image=None, name="", tags="", autosave=False, unique_id=None):
+        ensure_profile_ready()
         thumb = _make_thumb(image)
         _PENDING[str(unique_id)] = {"prompt": prompt or "", "thumb": thumb}
 
@@ -221,6 +223,7 @@ class OnyxPromptGallery:
     CATEGORY = "Onyx/Prompt"
 
     def run(self, prompt):
+        ensure_profile_ready()
         return (prompt,)
 
 

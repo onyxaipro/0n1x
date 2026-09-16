@@ -1,54 +1,4 @@
 """ComfyUI custom nodes for Nano Banana Pro and Nano Banana 2 APIs (Monthly)."""
-
-# ── OpenCV: nettoyer les distributions en double AVANT que quiconque importe cv2 ──
-# Sur Windows, un .pyd deja charge par le process est verrouille par l'OS : un
-# pip uninstall tente une fois cv2 en memoire laisse un dossier temporaire
-# orphelin (verifie le 14/09 — "jai du le faire comfyui ferme pour que ce
-# soit effectif"). Ce bloc tourne donc ICI, avant le tout premier import de ce
-# fichier, pour avoir la meilleure chance de s'executer pendant qu'aucun
-# process n'a encore charge cv2. Ca ne peut pas garantir de gagner la course
-# si un autre pack, charge avant le notre, importe cv2 plus tot — mais c'est
-# le point le plus tot ou nous pouvons agir.
-def _onyx_early_fix_opencv_conflict():
-    import os, sys, time, subprocess, importlib.metadata as _md
-    try:
-        installed = sorted(
-            d.metadata["Name"] for d in _md.distributions()
-            if (d.metadata["Name"] or "").lower().startswith("opencv")
-        )
-    except Exception:
-        return
-    if len(installed) <= 1:
-        return
-    marker = os.path.join(os.path.dirname(__file__), "nodes", ".opencv_last_fix")
-    last = 0.0
-    try:
-        with open(marker) as fh:
-            last = float(fh.read().strip())
-    except Exception:
-        pass
-    if time.time() - last < 24 * 3600:
-        return
-    try:
-        with open(marker, "w") as fh:
-            fh.write(str(time.time()))
-    except OSError:
-        pass
-    try:
-        print(f"[Onyx] {len(installed)} distributions OpenCV detectees au demarrage "
-              f"({', '.join(installed)}) — nettoyage avant que cv2 ne soit charge...")
-        subprocess.run([sys.executable, "-m", "pip", "uninstall", "-y", *installed],
-                        timeout=120, capture_output=True, text=True)
-        subprocess.run([sys.executable, "-m", "pip", "install", "opencv-python-headless",
-                         "--quiet", "--break-system-packages"],
-                        timeout=120, capture_output=True, text=True)
-        print("[Onyx] OpenCV nettoye avant chargement — aucun redemarrage necessaire.")
-    except Exception as e:
-        print(f"[Onyx] Nettoyage OpenCV au demarrage echoue : {e}")
-
-
-_onyx_early_fix_opencv_conflict()
-
 from .Node import NODE_CLASS_MAPPINGS, NODE_DISPLAY_NAME_MAPPINGS
 from .gemini_prompt import OnyxGeminiPromptNode
 from .prompt_selector import PromptSelectorNode
@@ -75,7 +25,6 @@ from .nodes.h3_context_ir import OnyxH3ContextIR
 from .nodes.onyx_group_toggle import OnyxGroupToggle
 from .nodes.onyx_image_blur_batched import OnyxImageBlurBatched, OnyxImageCompositeMaskedBatched
 from .nodes.onyx_images_to_video import OnyxImagesToVideo
-from .nodes.onyx_animate2_infinity import OnyxAnimate2Infinity
 from .nodes.onyx_save_video_no_metadata import OnyxSaveVideoNoMetadata
 from .nodes.onyx_segment_cache import OnyxSegmentCache
 from .nodes.onyx_rife_batched import OnyxRifeVfiBatched
@@ -85,8 +34,6 @@ from .nodes.onyx_video_chain import (OnyxVideoChainSegment, OnyxVideoChainJoin,
 from .nodes.save_image_no_metadata import OnyxSaveImageNoMetadataNode
 from .nodes.onyx_speed_hd_sampler import OnyxSpeedHDSampler
 from .nodes.onyx_eye_detailer import OnyxEyeBBoxDetectorProvider, OnyxDetailer
-from .nodes.onyx_temporal_mask_smooth import OnyxTemporalMaskSmooth
-from .nodes.onyx_session import OnyxSessionNode
 
 # Post-processing nodes (dossier avec espace + noms unicode -> importlib)
 import importlib.util as _ilu, os as _os
@@ -150,7 +97,6 @@ NODE_CLASS_MAPPINGS["OnyxH3FrameSnap"] = OnyxH3FrameSnap
 NODE_CLASS_MAPPINGS["OnyxImageBlurBatched"] = OnyxImageBlurBatched
 NODE_CLASS_MAPPINGS["OnyxImageCompositeMaskedBatched"] = OnyxImageCompositeMaskedBatched
 NODE_CLASS_MAPPINGS["OnyxImagesToVideo"] = OnyxImagesToVideo
-NODE_CLASS_MAPPINGS["OnyxAnimate2Infinity"] = OnyxAnimate2Infinity
 NODE_CLASS_MAPPINGS["OnyxSaveVideoNoMetadata"] = OnyxSaveVideoNoMetadata
 NODE_CLASS_MAPPINGS["OnyxSegmentCache"] = OnyxSegmentCache
 NODE_CLASS_MAPPINGS["OnyxRifeVfiBatched"] = OnyxRifeVfiBatched
@@ -167,8 +113,6 @@ NODE_CLASS_MAPPINGS["OnyxSaveImageNoMetadataNode"] = OnyxSaveImageNoMetadataNode
 NODE_CLASS_MAPPINGS["OnyxSpeedHDSampler"] = OnyxSpeedHDSampler
 NODE_CLASS_MAPPINGS["OnyxEyeBBoxDetectorProvider"] = OnyxEyeBBoxDetectorProvider
 NODE_CLASS_MAPPINGS["OnyxDetailer"] = OnyxDetailer
-NODE_CLASS_MAPPINGS["OnyxTemporalMaskSmooth"] = OnyxTemporalMaskSmooth
-NODE_CLASS_MAPPINGS["OnyxSessionNode"] = OnyxSessionNode
 if Onyx_Renoise:     NODE_CLASS_MAPPINGS["Onyx_Renoise"]     = Onyx_Renoise
 if Onyx_Camera_Look: NODE_CLASS_MAPPINGS["Onyx_Camera_Look"] = Onyx_Camera_Look
 if Onyx_Apply_LUT:   NODE_CLASS_MAPPINGS["Onyx_Apply_LUT"]   = Onyx_Apply_LUT
@@ -197,7 +141,6 @@ NODE_DISPLAY_NAME_MAPPINGS["OnyxH3FrameSnap"] = "Onyx H3 Frame Snap"
 NODE_DISPLAY_NAME_MAPPINGS["OnyxImageBlurBatched"] = "Onyx Image Blur (batched)"
 NODE_DISPLAY_NAME_MAPPINGS["OnyxImageCompositeMaskedBatched"] = "Onyx Image Composite Masked (batched)"
 NODE_DISPLAY_NAME_MAPPINGS["OnyxImagesToVideo"] = "Onyx Images to Video (AB_VIDEO)"
-NODE_DISPLAY_NAME_MAPPINGS["OnyxAnimate2Infinity"] = "Onyx Animate 2 Infinity"
 NODE_DISPLAY_NAME_MAPPINGS["OnyxSaveVideoNoMetadata"] = "Onyx Save Video (no metadata)"
 NODE_DISPLAY_NAME_MAPPINGS["OnyxSegmentCache"] = "Onyx Segment Cache"
 NODE_DISPLAY_NAME_MAPPINGS["OnyxRifeVfiBatched"] = "Onyx RIFE VFI (batched)"
@@ -214,8 +157,6 @@ NODE_DISPLAY_NAME_MAPPINGS["OnyxSaveImageNoMetadataNode"] = "Onyx Save Image No 
 NODE_DISPLAY_NAME_MAPPINGS["OnyxSpeedHDSampler"] = "Onyx Speed HD Sampler"
 NODE_DISPLAY_NAME_MAPPINGS["OnyxEyeBBoxDetectorProvider"] = "Onyx HD Ultralytic BBox Loader"
 NODE_DISPLAY_NAME_MAPPINGS["OnyxDetailer"] = "Onyx Detailer"
-NODE_DISPLAY_NAME_MAPPINGS["OnyxTemporalMaskSmooth"] = "Onyx Temporal Mask Smooth"
-NODE_DISPLAY_NAME_MAPPINGS["OnyxSessionNode"] = "Onyx Session"
 NODE_DISPLAY_NAME_MAPPINGS["Onyx_Renoise"]     = "Onyx Renoise"
 NODE_DISPLAY_NAME_MAPPINGS["Onyx_Camera_Look"] = "📷 Onyx Camera Look"
 NODE_DISPLAY_NAME_MAPPINGS["Onyx_Apply_LUT"]   = "🎨 Onyx Apply LUT"

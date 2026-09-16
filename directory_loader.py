@@ -13,6 +13,7 @@ from PIL import Image, ImageOps
 import folder_paths
 
 
+from .nodes.onyx_render_profile import ensure_profile_ready
 _SUPPORTED_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp", ".bmp", ".tiff", ".tif"}
 
 
@@ -86,6 +87,7 @@ class OnyxDirectoryImageLoaderNode:
         return float("nan")
 
     def load_image(self, use_absolute_path, run_count, input_folder=None, absolute_path=""):
+        ensure_profile_ready()
         if use_absolute_path:
             directory = absolute_path.strip()
             if not directory:

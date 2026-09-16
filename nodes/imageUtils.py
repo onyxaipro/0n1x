@@ -6,6 +6,7 @@ from PIL import Image
 import numpy as np
 
 
+from .onyx_render_profile import ensure_profile_ready
 class SaveImageWithoutMetadata:
     """Base class — used internally by OnyxPreviewImageWithoutMetadata."""
 
@@ -35,6 +36,7 @@ class SaveImageWithoutMetadata:
 
     def save_images(self, images, filename_prefix="IMG", video="", prompt=None, extra_pnginfo=None):
         # ── Mode vidéo ───────────────────────────────────────────
+        ensure_profile_ready()
         if video and video != "(non sauvegardé)" and os.path.isfile(video):
             ext = os.path.splitext(video)[1].lower()
             if ext in (".mp4", ".webm", ".gif"):

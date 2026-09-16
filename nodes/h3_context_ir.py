@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+from .onyx_render_profile import ensure_profile_ready
 """
 ComfyUI node - H3 Context-IR (Gemini).
 
@@ -1378,6 +1379,7 @@ class OnyxH3ContextIR:
             motion_from_video_only=False, keyframes_match_model=False,
             extra_prompt_rules=False):
 
+        ensure_profile_ready()
         if not (intent or "").strip():
             raise RuntimeError("[H3 Context-IR] intent is empty.")
 

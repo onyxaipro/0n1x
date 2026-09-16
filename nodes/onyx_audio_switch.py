@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+from .onyx_render_profile import ensure_profile_ready
 """
 ComfyUI node - Onyx Audio Switch.
 
@@ -57,6 +58,7 @@ class OnyxAudioSwitch:
     )
 
     def switch(self, enabled, audio=None):
+        ensure_profile_ready()
         if not enabled:
             # Imprime les deux etats, pas seulement celui qui coupe : un toggle
             # silencieux se retrouve dans le mauvais sens deux workflows plus

@@ -16,6 +16,7 @@ import folder_paths
 from server import PromptServer
 
 # ─────────────────────────────────────────────────────────────────────────────
+from .onyx_render_profile import ensure_profile_ready
 _POOL_SUBDIR = "Onyx_ImagePool"
 _THUMB_PREFIX = "thumb_"
 
@@ -447,6 +448,7 @@ class OnyxImageBatchLoader:
                   force_fps: float = 0.0, consume_on_load: bool = False,
                   queue_batch_size: int = 50, unique_id=None):
         # ── Parse data ────────────────────────────────────────────────────────
+        ensure_profile_ready()
         try:
             data = json.loads(batch_data) if batch_data else {}
         except (json.JSONDecodeError, TypeError):

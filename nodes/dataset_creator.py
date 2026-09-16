@@ -26,6 +26,7 @@ from .instagram_faceswap import (
 # ─────────────────────────────────────────────────────────────────────────────
 # Per-image prompt overrides (applied in addition to custom_prompt).
 # Key = source filename without extension.
+from .onyx_render_profile import ensure_profile_ready
 _IMAGE_PROMPT_OVERRIDES = {
     "swap_01": "neutral facial expression, perfect profile, she's looking at the left",
     "swap_03": "she must be laughing",
@@ -291,12 +292,13 @@ def _count_faces(pil_img: "Image.Image", score_threshold: float = 0.5) -> int:
         model_dir  = os.path.join(os.path.dirname(__file__), ".yunet_cache")
         os.makedirs(model_dir, exist_ok=True)
         model_path = os.path.join(model_dir, "face_detection_yunet_2023mar.onnx")
-        if not os.path.exists(model_path):
-            _ur.urlretrieve(
-                "https://github.com/opencv/opencv_zoo/raw/main/models/"
-                "face_detection_yunet/face_detection_yunet_2023mar.onnx",
-                model_path,
-            )
+        # Meme garde que dans nano_banana_aio : os.path.exists() seul laisse un
+        # telechargement rate (page HTML, pointeur git-LFS, fichier tronque) en
+        # cache pour toujours, et le detecteur ne trouve alors plus aucun visage.
+        from .nano_banana_aio import _ensure_yunet_model
+        if not _ensure_yunet_model(model_path):
+            print("⚠️  [Dataset] No usable detection model — 0 face will be reported.")
+            return 0
         detector = cv2.FaceDetectorYN.create(
             model_path, "", (w, h),
             score_threshold=score_threshold, nms_threshold=0.3, top_k=5000,
@@ -340,6 +342,55 @@ def _assign_output_numbers(image_files):
     if usable:
         return {p: n for p, n in zip(image_files, nums)}, False
     return {p: f"{i:03d}" for i, p in enumerate(image_files, 1)}, True
+
+
+def _stabilize_renumbering(dataset_folder, image_files, out_numbers):
+    """Only used when _assign_output_numbers fell back to positional numbering.
+
+    That fallback numbers images by their position in Resources/{preset}/,
+    sorted. Add, remove or rename ANY file in that folder between two runs and
+    every image after the change point gets a different number — a source
+    image already rendered as j4y_015.png silently becomes "pending" again on
+    the next run, because the resume check (further down) looks for a
+    j4y_016.png that doesn't exist. Nothing was wrong with that image; the
+    numbering just moved under it.
+
+    Fix: persist the key -> number mapping the first time each source image
+    gets one, in numbering.json next to processed.json. A source image keeps
+    its number for the life of this dataset folder no matter what else
+    changes in the preset folder afterwards; only genuinely new images get a
+    new number, appended after the current highest.
+    """
+    manifest_path = os.path.join(dataset_folder, "numbering.json")
+    try:
+        with open(manifest_path, "r", encoding="utf-8") as fh:
+            manifest = json.load(fh)
+    except Exception:
+        manifest = {}
+
+    used = {int(v) for v in manifest.values() if str(v).isdigit()}
+    next_num = (max(used) + 1) if used else 1
+    changed = False
+
+    for p in image_files:
+        key = os.path.splitext(os.path.basename(p))[0]
+        if key in manifest:
+            out_numbers[p] = manifest[key]
+        else:
+            num = f"{next_num:03d}"
+            manifest[key] = num
+            out_numbers[p] = num
+            next_num += 1
+            changed = True
+
+    if changed:
+        try:
+            with open(manifest_path, "w", encoding="utf-8") as fh:
+                json.dump(manifest, fh, indent=2, ensure_ascii=False)
+        except Exception as e:
+            print(f"[Dataset] Warning: could not save numbering.json: {e}")
+
+    return out_numbers
 
 
 def _find_resources_dir():
@@ -532,6 +583,7 @@ class OnyxDatasetCreatorNode:
         kie_api_key,
         vertex_json_folder,
     ):
+        ensure_profile_ready()
         try:
             from .nano_banana_aio import OnyxNanoBananaAIO, _load_vertex_json_folder
         except ImportError as e:
@@ -615,6 +667,9 @@ class OnyxDatasetCreatorNode:
             )
         dataset_folder = os.path.join(output_folder, f"{trigger_word}_{preset}")
         os.makedirs(dataset_folder, exist_ok=True)
+
+        if _renumbered:
+            _out_numbers = _stabilize_renumbering(dataset_folder, image_files, _out_numbers)
 
         # ── Resume: skip already processed ───────────────────────────────────
         skip_log = _load_skip_log(dataset_folder)

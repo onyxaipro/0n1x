@@ -4,6 +4,7 @@ Sortie unique : AB_VIDEO (chemin absolu) → à connecter à video_reference du 
 """
 import os
 
+from .onyx_render_profile import ensure_profile_ready
 try:
     import folder_paths as _fp
 except ImportError:
@@ -60,6 +61,7 @@ class OnyxVideoLoader:
         return True
 
     def load_video(self, video):
+        ensure_profile_ready()
         if not _fp:
             raise RuntimeError("[Onyx Video Loader] folder_paths non disponible.")
         video_path = _fp.get_annotated_filepath(video)

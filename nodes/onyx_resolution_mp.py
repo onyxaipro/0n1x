@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+from .onyx_render_profile import ensure_profile_ready
 """
 ComfyUI node - Onyx Resolution (MP).
 
@@ -149,6 +150,7 @@ class OnyxResolutionMP:
     )
 
     def compute(self, megapixels, aspect_ratio, multiple_of, image=None):
+        ensure_profile_ready()
         preset = _ASPECT_PRESETS.get(aspect_ratio)
 
         if preset is None:

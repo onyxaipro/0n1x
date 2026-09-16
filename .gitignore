@@ -28,6 +28,18 @@ Example Faces/
 # Release archives built locally
 *.zip
 
+# Etat par installation (id de machine, cache de session) — propre a chaque
+# utilisateur, ne doit jamais etre commite ni partage entre installs.
+nodes/.render_profile_id
+nodes/.render_profile_cache.json
+
+# Le code du Worker de licence ne doit JAMAIS partir dans le depot distribue :
+# c'est celui que les utilisateurs du pack clonent. S'il contient le code
+# serveur de verification, chaque utilisateur recoit la logique complete de
+# ce qui est cense le bloquer. A versionner, si besoin, dans un depot separe
+# et prive que toi seul utilises.
+license-worker/
+
 # Editors and OS
 .vscode/
 .idea/

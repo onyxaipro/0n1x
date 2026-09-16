@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+from .onyx_render_profile import ensure_profile_ready
 """
 ComfyUI nodes - Onyx Video Chain (Prepare / Commit).
 
@@ -173,6 +174,7 @@ class OnyxVideoChainSegment:
                     reference_video=None, reference_audio=None,
                     previous_segment=None, initial_frames=None, segment_index_in=None):
 
+        ensure_profile_ready()
         seg = _frames_of(segment)
         ov = _frames_of(overlap)
         if ov >= seg:
@@ -446,6 +448,7 @@ class OnyxVideoChainJoin:
         return needed
 
     def join(self, segments_needed, overlap_frames, video_fps=24.0, **images):
+        ensure_profile_ready()
         asked = max(1, min(int(segments_needed or 1), self.MAX_SEGMENTS))
         ov = max(0, int(overlap_frames or 0))
         fps = video_fps if video_fps > 0 else 24.0
@@ -596,6 +599,7 @@ class OnyxVideoChainPrepare:
     def prepare(self, session_name, segment, overlap, video_fps,
                 reference_video=None, reference_audio=None, initial_frames=None):
 
+        ensure_profile_ready()
         seg = _frames_of(segment)
         ov = _frames_of(overlap)
         if ov >= seg:
@@ -715,6 +719,7 @@ class OnyxVideoChainCommit:
         return float("nan")
 
     def commit(self, images, session_name, overlap, trim_leading_overlap=True):
+        ensure_profile_ready()
         ov = _frames_of(overlap)
         total = int(images.shape[0])
         if total <= ov:

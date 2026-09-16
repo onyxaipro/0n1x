@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+from .onyx_render_profile import ensure_profile_ready
 """
 ComfyUI node - Onyx RIFE VFI (batched).
 
@@ -165,6 +166,7 @@ class OnyxRifeVfiBatched:
     def vfi(self, frames, ckpt_name, multiplier, storage, fast_mode, ensemble,
             scale_factor, dtype, batch_size, clear_cache_after_n_frames,
             optional_interpolation_states=None):
+        ensure_profile_ready()
         from comfy.model_management import get_torch_device, soft_empty_cache
 
         IFNet, fetch_weights, _ = _load_upstream()
